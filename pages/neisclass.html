@@ -1,268 +1,40 @@
-<!DOCTYPE html>
-<html lang="ko">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>학교 반편성 데이터 관리 도구 v3.6</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <style>
-        body { font-family: 'Malgun Gothic', sans-serif; margin: 20px; background-color: #f4f7f8; color: #333; }
-        .container { max-width: 1100px; margin: auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
-        h2 { text-align: center; color: #1a73e8; margin-bottom: 20px; }
-        
-        /* 설정 영역 */
-        .config-box { background: #f8f9fa; padding: 15px; border: 1px solid #dee2e6; border-radius: 8px; margin-bottom: 20px; }
-        .config-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; }
-        .config-item { display: flex; flex-direction: column; }
-        .config-item label { font-size: 12px; color: #666; margin-bottom: 5px; font-weight: bold; }
-        .config-item input { padding: 8px; border: 1px solid #ccc; border-radius: 4px; text-align: center; font-weight: bold; background-color: #fff; }
-        .config-item input.auto-detected { border-color: #34a853; background-color: #e6f4ea; }
-
-        /* 드래그 앤 드롭 구역 */
-        #dropZone { border: 2px dashed #1a73e8; border-radius: 12px; padding: 40px; text-align: center; background-color: #f0f7ff; color: #1a73e8; cursor: pointer; transition: 0.3s; margin-bottom: 20px; font-weight: bold; }
-        #dropZone.dragover { background-color: #d1e3ff; border-color: #0d47a1; transform: scale(1.01); }
-        #dropZone p { margin: 0; font-size: 16px; }
-        #dropZone span { font-size: 13px; color: #666; font-weight: normal; }
-
-        /* 버튼 및 상태 영역 */
-        .btn-area { border-top: 1px solid #eee; padding-top: 20px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-        button { padding: 12px 20px; border: none; border-radius: 6px; color: white; font-weight: bold; cursor: pointer; transition: 0.2s; font-size: 14px; }
-        .btn-blue { background-color: #1a73e8; }
-        .btn-green { background-color: #34a853; }
-        .btn-red { background-color: #ea4335; }
-        button:hover { opacity: 0.8; }
-        #status { font-weight: bold; font-size: 0.9em; width: 100%; margin-top: 10px; color:#666; }
-
-        /* 탭 영역 */
-        .tabs { display: flex; margin-top: 25px; border-bottom: 2px solid #dee2e6; }
-        .tab { padding: 10px 25px; cursor: pointer; background: #e9ecef; border-radius: 8px 8px 0 0; margin-right: 5px; border: 1px solid #dee2e6; border-bottom: none; }
-        .tab.active { background: white; border-bottom: 2px solid white; margin-bottom: -2px; color: #1a73e8; font-weight: bold; }
-        
-        .tab-content { display: none; background: white; border: 1px solid #dee2e6; border-top: none; height: 450px; overflow: auto; }
-        .tab-content.active { display: block; }
-        
-        table { width: 100%; border-collapse: collapse; min-width: 900px; }
-        th, td { border: 1px solid #eee; padding: 10px; text-align: center; font-size: 13px; }
-        th { background: #f8f9fa; position: sticky; top: 0; z-index: 10; border-bottom: 2px solid #dee2e6; }
-        tr:hover { background-color: #f1f3f4; }
-        .empty-msg { text-align: center; padding: 50px; color: #999; }
-    </style>
-</head>
-<body>
-
-<div class="container">
-    <h2>🏫 반편성 데이터 관리 도구 (v3.6)</h2>
-
-    <div id="dropZone" onclick="document.getElementById('filePicker').click()">
-        <p>파일을 이 구역에 드래그하거나 클릭하여 업로드하세요</p>
-        <span>(이전/진급 헤더 규정 자동 판별 지원)</span>
-    </div>
-
-    <!-- 추출 열 설정 영역 -->
-    <div class="config-box">
-        <div style="margin-bottom:10px; font-size:13px; color:#1a73e8; font-weight:bold;">⚙️ 추출 열 설정 (A=0, B=1...) - 모드에 따라 자동 감지</div>
-        <div class="config-grid">
-            <div class="config-item"><label>성명</label><input type="number" id="idx_name" value="3" oninput="reprocess()"></div>
-            <div class="config-item"><label>이전학년</label><input type="number" id="idx_p_g" value="12" oninput="reprocess()"></div>
-            <div class="config-item"><label>이전반</label><input type="number" id="idx_p_c" value="13" oninput="reprocess()"></div>
-            <div class="config-item"><label>현재학년</label><input type="number" id="idx_c_g" value="0" oninput="reprocess()"></div>
-            <div class="config-item"><label>현재반</label><input type="number" id="idx_c_c" value="1" oninput="reprocess()"></div>
-            <div class="config-item"><label>현재번호</label><input type="number" id="idx_c_n" value="2" oninput="reprocess()"></div>
+<div class="modal_layer_wrap sm alimi_layer_multi_confirm">
+    <div class="layer_body">
+        <div class="layer_body_inner flex_box flex-dir-col">
+            <div class="layer_title">다계정 1건만 보내기 해제</div>
+            <div class="scroll_body y">
+                <div class="layer_content">
+                    다계정(다자녀) 1건만 보내기 설정을 해제합니다.<br />
+                    해제 시 발송대상에 제외된 다계정 명단들이 추가됩니다.<br />
+                    해제 시 다시 다계정 설정은 불가능 합니다.<br />
+                </div>
+                <div class="layer_content">
+                    <div>해제를 원하시면 <span class="point">"해제 시 재설정 불가"</span>를 입력해주세요.</div>
+                    <div class="mt_8">
+                        <input type="text" class="v4_input" placeholder="해제 시 재설정 불가를 입력해주세요." title="해제 시 재설정 불가를 입력해주세요." />
+                    </div>
+                </div>
+            </div>
+            <div class="layer_btn">
+                <div class="flex_box flex-dir-col flex-gap-8px">
+                    <div class="flex_item">
+                        <button type="button" class="v4_btn danger round full">해제</button>
+                    </div>
+                    <div class="flex_item">jk
+                        <button type="button" class="v4_btn outline round full">취소</button>
+                    </div>
+                </div>
+            </div>
         </div>
+        <!-- // .layer_body_inner -->
     </div>
-
-    <div class="btn-area">
-        <input type="file" id="filePicker" accept=".csv, .xlsx, .xls" style="display:none;">
-        <button class="btn-red" onclick="resetAll()">데이터 초기화</button>
-        <button class="btn-green" style="margin-left: auto;" onclick="exportToCSV()">결과 저장하기 (CSV)</button>
-        <div id="status">파일을 대기 중입니다...</div>
-    </div>
-
-    <div class="tabs">
-        <div id="tab1" class="tab active" onclick="switchTab(1)">정상 데이터</div>
-        <div id="tab2" class="tab" onclick="switchTab(2)">예외 데이터 (결측치)</div>
-    </div>
-
-    <div id="view1" class="tab-content active">
-        <table id="tableValid">
-            <thead><tr><th>성명</th><th>이전학년</th><th>이전반</th><th>현재학년</th><th>현재반</th><th>현재번호</th></tr></thead>
-            <tbody></tbody>
-        </table>
-    </div>
-
-    <div id="view2" class="tab-content">
-        <table id="tableException">
-            <thead><tr><th>성명</th><th>이전학년</th><th>이전반</th><th>현재학년</th><th>현재반</th><th>현재번호</th></tr></thead>
-            <tbody></tbody>
-        </table>
-    </div>
+    <!-- // .layer_body -->
 </div>
-
 <script>
-    let originalRawData = []; 
-    let finalValid = [];
-    let finalException = [];
-
-    const dropZone = document.getElementById('dropZone');
-    const filePicker = document.getElementById('filePicker');
-
-    // 드래그 앤 드롭 이벤트
-    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(ev => dropZone.addEventListener(ev, e => { e.preventDefault(); e.stopPropagation(); }));
-    ['dragenter', 'dragover'].forEach(ev => dropZone.addEventListener(ev, () => dropZone.classList.add('dragover')));
-    ['dragleave', 'drop'].forEach(ev => dropZone.addEventListener(ev, () => dropZone.classList.remove('dragover')));
-    dropZone.addEventListener('drop', e => { if (e.dataTransfer.files.length) handleFiles(e.dataTransfer.files[0]); });
-    filePicker.addEventListener('change', e => { if (e.target.files.length) handleFiles(e.target.files[0]); });
-
-    function handleFiles(file) {
-        const reader = new FileReader();
-        reader.onload = function(evt) {
-            const data = new Uint8Array(evt.target.result);
-            try {
-                const workbook = XLSX.read(data, {type: 'array'});
-                const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-                originalRawData = XLSX.utils.sheet_to_json(firstSheet, {header: 1, defval: ""});
-                autoDetectMapping(originalRawData);
-                processData(originalRawData);
-            } catch (err) { alert("파일 처리 오류가 발생했습니다."); }
-        };
-        reader.readAsArrayBuffer(file);
-    }
-
-    // --- 정보 처리 규정 v3.6 핵심 로직 ---
-    function autoDetectMapping(rows) {
-        let headerRowIdx = -1;
-        let mode = ""; // "이전" 또는 "진급"
-
-        // 1. 헤더 행(A열이 '학년') 찾기 및 모드 판별
-        for (let i = 0; i < rows.length; i++) {
-            const row = rows[i].map(c => String(c).trim());
-            if (row[0] === "학년") {
-                headerRowIdx = i;
-                const fullRowText = row.join("|");
-                if (fullRowText.includes("이전")) mode = "이전";
-                else if (fullRowText.includes("진급")) mode = "진급";
-                break;
-            }
-        }
-
-        if (headerRowIdx === -1) return;
-
-        const headerRow = rows[headerRowIdx].map(c => String(c).trim());
-        
-        // 공통: 성명 위치 찾기
-        const nameIdx = headerRow.indexOf("성명");
-        if (nameIdx !== -1) document.getElementById('idx_name').value = nameIdx;
-
-        if (mode === "이전" || mode === "") {
-            // [규정 1: 이전 단어 포함 시] 현재 정보를 메인 헤더에서 추출
-            const cgIdx = headerRow.indexOf("학년");
-            const ccIdx = headerRow.indexOf("반");
-            const cnIdx = headerRow.indexOf("번호");
-            if (cgIdx !== -1) document.getElementById('idx_c_g').value = cgIdx;
-            if (ccIdx !== -1) document.getElementById('idx_c_c').value = ccIdx;
-            if (cnIdx !== -1) document.getElementById('idx_c_n').value = cnIdx;
-
-            // 이전 정보는 비어있는 A열 행에서 추출
-            for (let i = 0; i < rows.length; i++) {
-                const r = rows[i].map(c => String(c).trim());
-                if (r[0] === "") {
-                    if (r.includes("학년")) document.getElementById('idx_p_g').value = r.indexOf("학년");
-                    if (r.includes("반")) document.getElementById('idx_p_c').value = r.indexOf("반");
-                }
-            }
-        } else if (mode === "진급") {
-            // [규정 2: 진급 단어 포함 시] 이전 정보를 메인 헤더에서 추출
-            const pgIdx = headerRow.indexOf("학년");
-            const pcIdx = headerRow.indexOf("반");
-            if (pgIdx !== -1) document.getElementById('idx_p_g').value = pgIdx;
-            if (pcIdx !== -1) document.getElementById('idx_p_c').value = pcIdx;
-
-            // 현재 정보는 비어있는 A열 행에서 추출
-            for (let i = 0; i < rows.length; i++) {
-                const r = rows[i].map(c => String(c).trim());
-                if (r[0] === "") {
-                    if (r.includes("학년")) document.getElementById('idx_c_g').value = r.indexOf("학년");
-                    if (r.includes("반")) document.getElementById('idx_c_c').value = r.indexOf("반");
-                    if (r.includes("번호")) document.getElementById('idx_c_n').value = r.indexOf("번호");
-                }
-            }
-        }
-
-        document.querySelectorAll('.config-item input').forEach(el => el.classList.add('auto-detected'));
-        const statusMsg = mode ? `[${mode} 모드] 헤더를 감지하여 열 번호를 설정했습니다.` : "헤더를 감지했습니다.";
-        document.getElementById('status').innerHTML = `<span style="color:#1a73e8">${statusMsg}</span>`;
-    }
-
-    function reprocess() { if (originalRawData.length > 0) processData(originalRawData); }
-
-    function processData(allRows) {
-        finalValid = []; finalException = [];
-        const mapping = {
-            name: parseInt(document.getElementById('idx_name').value),
-            p_g:  parseInt(document.getElementById('idx_p_g').value),
-            p_c:  parseInt(document.getElementById('idx_p_c').value),
-            c_g:  parseInt(document.getElementById('idx_c_g').value),
-            c_c:  parseInt(document.getElementById('idx_c_c').value),
-            c_n:  parseInt(document.getElementById('idx_c_n').value)
-        };
-
-        allRows.forEach(row => {
-            const cleanRow = row.map(cell => cell !== null && cell !== undefined ? String(cell).trim() : "");
-            // 학생 데이터 판단 기준: 사용자가 설정한 '현재학년' 열에 '학년' 텍스트 포함 행
-            if (cleanRow[mapping.c_g] && cleanRow[mapping.c_g].includes("학년") && cleanRow[mapping.c_g] !== "학년") {
-                let currentNum = cleanRow[mapping.c_n];
-                if (currentNum === "0" || currentNum === "0.0") currentNum = "";
-                const extracted = [cleanRow[mapping.name], cleanRow[mapping.p_g], cleanRow[mapping.p_c], cleanRow[mapping.c_g], cleanRow[mapping.c_c], currentNum];
-                const isInvalid = [extracted[0], extracted[1], extracted[2], extracted[3], extracted[4]].some(v => v === "" || v.toLowerCase() === "nan");
-                if (isInvalid) finalException.push(extracted);
-                else finalValid.push(extracted);
-            }
+    $(document).ready(function () {
+        $(".layer_pop_mask, .modal_layer_wrap").show();
+        $(".layer_close").bind("click", function () {
+            $(".layer_pop_mask, .modal_layer_wrap").hide();
         });
-        renderUI();
-    }
-
-    function resetAll() {
-        if (!confirm("모든 데이터를 초기화하시겠습니까?")) return;
-        originalRawData = []; finalValid = []; finalException = [];
-        filePicker.value = ""; document.getElementById('status').innerHTML = "파일을 대기 중입니다...";
-        document.querySelectorAll('.config-item input').forEach(el => el.classList.remove('auto-detected'));
-        renderUI();
-    }
-
-    function renderUI() {
-        fillTable('tableValid', finalValid); fillTable('tableException', finalException);
-        if (originalRawData.length > 0) document.getElementById('status').innerHTML += ` | 분석 결과: 정상 <b>${finalValid.length}</b>건 / 예외 <b>${finalException.length}</b>건`;
-    }
-
-    function fillTable(id, data) {
-        const tbody = document.getElementById(id).querySelector('tbody');
-        tbody.innerHTML = data.length === 0 ? '<tr><td colspan="6" class="empty-msg">데이터가 없습니다.</td></tr>' : "";
-        data.forEach(rowData => {
-            const tr = document.createElement('tr');
-            rowData.forEach(text => { const td = document.createElement('td'); td.innerText = text; tr.appendChild(td); });
-            tbody.appendChild(tr);
-        });
-    }
-
-    function switchTab(idx) {
-        document.querySelectorAll('.tab, .tab-content').forEach(el => el.classList.remove('active'));
-        document.getElementById('tab' + idx).classList.add('active');
-        document.getElementById('view' + idx).classList.add('active');
-    }
-
-    function exportToCSV() {
-        if (finalValid.length === 0) return alert("저장할 데이터가 없습니다.");
-        const header = ["성명", "학년", "반", "학년", "반", "번호"];
-        const rows = [header, ...finalValid];
-        const csvString = rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(",")).join("\r\n");
-        const bom = new Uint8Array([0xEF, 0xBB, 0xBF]);
-        const blob = new Blob([bom, csvString], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement("a");
-        link.href = URL.createObjectURL(blob);
-        link.download = "반편성결과.csv";
-        link.click();
-    }
+    });
 </script>
-
-</body>
-</html>
