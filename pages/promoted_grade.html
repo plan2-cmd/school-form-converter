@@ -18,6 +18,7 @@
     .status { margin-top: 10px; padding: 10px 12px; border-radius: 10px; background: #f6f6f6; }
     .ok { color: #0a7a0a; font-weight: 700; }
     .err { color: #b00020; font-weight: 700; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; white-space: pre-wrap; }
     table { border-collapse: collapse; width: 100%; margin-top: 10px; }
     th, td { border: 1px solid #ddd; padding: 6px 8px; font-size: 12px; }
     th { background: #fafafa; text-align: left; }
@@ -27,8 +28,15 @@
     h4 { font-size: 13px; }
   </style>
 
+  <!-- 라이브러리 (CDN) -->
+  <!-- XLSX: 엑셀 파싱 -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <!-- PapaParse: CSV 파싱/생성 -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+  <!-- encoding-japanese: CP949 인코딩 지원 -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/encoding-japanese/2.1.0/encoding.min.js"></script>
+  <!-- iconv-lite 브라우저 버전 (jsdelivr CDN) -->
+  <script src="https://cdn.jsdelivr.net/npm/iconv-lite@0.6.3/lib/index.min.js"></script>
 </head>
 
 <body>
@@ -39,9 +47,6 @@
       업로드 파일: <b>xlsx/csv</b> / 결과 파일: <b>CSV(쉼표 구분) 4개</b><br/>
       <span class="small">※ 데이터는 외부 전송 없이 이 브라우저에서만 처리됩니다.</span>
     </div>
-    <button onclick="document.getElementById('manual').scrollIntoView({behavior:'smooth'});" class="primary" style="margin-top:10px;">
-      사용매뉴얼로 이동
-    </button>
   </div>
 
   <div class="card">
@@ -80,14 +85,35 @@
       <button id="dlUpload" disabled>진급_업로드용(매칭행만) 다운로드</button>
       <button id="dlReport" disabled>진급_매칭리포트 다운로드</button>
       <button id="dlMissing" disabled>진급누락목록 다운로드</button>
+      <!-- 롤백파일 다운로드 버튼 추가 -->
       <button id="dlRollback" disabled>롤백파일 다운로드</button>
     </div>
     <div id="resultSummary" class="status" style="margin-top:12px;">실행 후 결과 요약이 표시됩니다.</div>
-    <div class="small" style="margin-top:6px;">
-      - 업로드용/롤백파일은 <b>EUC-KR 인코딩</b> CSV(쉼표 구분)로 내려받습니다(시스템 업로드용).<br/>
-      - 리포트/누락목록은 Excel 호환을 위해 UTF-8 BOM을 포함합니다.<br/>
-      - 롤백파일은 업로드용 파일의 학년/반/번호를 원래대로 복구할 때 사용합니다.
-    </div>
+    <table style="margin-top:10px;">
+      <thead><tr><th>파일</th><th>설명</th><th>사용 목적</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><b>진급_업로드용(매칭행만)</b></td>
+          <td>매칭 성공한 행만 남김. 빈 열 자동 삭제. EUC-KR 인코딩.</td>
+          <td><b>e알리미 진급 페이지 업로드</b></td>
+        </tr>
+        <tr>
+          <td><b>진급_매칭리포트</b></td>
+          <td>파싱된 학년/반/번호와 상태(매칭/미매칭 사유) 기록</td>
+          <td>검수 및 원인분석</td>
+        </tr>
+        <tr>
+          <td><b>진급누락목록</b></td>
+          <td>e알리미 명단 중 누락 + 진급명렬 중 누락 (졸업생 제외)</td>
+          <td>누락 보정/추적</td>
+        </tr>
+        <tr>
+          <td><b>롤백파일</b></td>
+          <td>업로드용 파일의 학년/반/번호를 원래대로 교환</td>
+          <td>잘못된 업로드 복구</td>
+        </tr>
+      </tbody>
+    </table>
   </div>
 
   <div class="card">
@@ -96,99 +122,11 @@
     <div id="previewArea"></div>
   </div>
 
-  <div class="card" id="manual">
-    <div class="title">사용매뉴얼</div>
-    <div class="sub">
-      이 도구는 <b>학교 진급명렬</b>과 <b>e알리미 진급 양식</b>을 매칭하여,
-      e알리미 양식의 <b>뒤쪽(두 번째) 학년/반/번호</b> 컬럼을 자동으로 채웁니다.
-    </div>
-
-    <div style="margin-top:10px;">
-      <button onclick="document.getElementById('manualDetail').style.display = (document.getElementById('manualDetail').style.display==='none'?'block':'none')">
-        매뉴얼 펼치기/접기
-      </button>
-    </div>
-
-    <div id="manualDetail" style="display:block; margin-top:12px; line-height:1.7; color:#222;">
-
-      <h3 style="margin:14px 0 6px;">1. 준비물</h3>
-      <ul style="margin-top:6px;">
-        <li><b>학교 진급명렬 파일</b> (xlsx 또는 csv)</li>
-        <li><b>e알리미 진급 양식 파일</b> (xlsx 또는 csv)</li>
-        <li>본 HTML 실행파일(더블클릭하여 브라우저로 실행)</li>
-      </ul>
-
-      <h3 style="margin:14px 0 6px;">2. 파일 규격</h3>
-
-      <h4 style="margin:10px 0 6px;">2.1 학교 진급명렬 (1차 업로드)</h4>
-      <div class="small" style="color:#444;">
-        <b>중요:</b> 컬럼명이 무엇이든 상관없이 <b>앞 7개 컬럼의 위치</b>를 아래 의미로 고정합니다.<br/>
-        학년/반 값이 "1학년", "1반" 형태의 텍스트여도 숫자를 자동 추출합니다.
-      </div>
-      <table>
-        <thead><tr><th>컬럼 위치</th><th>의미</th><th>예시</th></tr></thead>
-        <tbody>
-          <tr><td>1</td><td>학생이름</td><td>홍길동, 변지한(BIANZHIHAN)</td></tr>
-          <tr><td>2</td><td>이전학년</td><td>3 또는 "3학년"</td></tr>
-          <tr><td>3</td><td>이전반</td><td>2 또는 "2반"</td></tr>
-          <tr><td>4</td><td>이전번호</td><td>15</td></tr>
-          <tr><td>5</td><td>진급학년</td><td>4 또는 "4학년"</td></tr>
-          <tr><td>6</td><td>진급반</td><td>1 또는 "1반"</td></tr>
-          <tr><td>7</td><td>진급번호</td><td>3</td></tr>
-        </tbody>
-      </table>
-
-      <h4 style="margin:10px 0 6px;">2.2 졸업학년 판정</h4>
-      <ul style="margin-top:6px;">
-        <li>e알리미 양식에 <b>4학년 또는 5학년</b> 데이터가 있으면 → 졸업학년 = <b>6학년</b></li>
-        <li>e알리미 양식에 4/5학년이 없으면 → 졸업학년 = <b>3학년</b></li>
-      </ul>
-
-      <h4 style="margin:10px 0 6px;">2.3 e알리미 진급 양식 (2차 업로드)</h4>
-      <ul style="margin-top:6px;">
-        <li>e알리미 양식에는 <b>학년/반</b> 컬럼이 각각 <b>2개 이상</b> 있어야 합니다.</li>
-        <li>본 도구는 e알리미 양식의 <b>두 번째(뒤쪽) 학년/반</b>을 "진급정보"로 채웁니다.</li>
-        <li>번호는 기본적으로 "번호/학급번호" 계열을 인식하며, <b>학부모전화번호/연락처</b>는 번호 컬럼으로 보지 않습니다.</li>
-      </ul>
-
-      <h3 style="margin:14px 0 6px;">3. 매칭 규칙(동일인 판정)</h3>
-      <ol style="margin-top:6px;">
-        <li><b>1순위(정확):</b> 이름 + 현재학년 + 현재반 + 현재번호(번호 포함 매칭)</li>
-        <li><b>2순위(대체):</b> 이름 + 현재학년 + 현재반(현재번호가 없거나 불일치 시)</li>
-      </ol>
-
-      <h3 style="margin:14px 0 6px;">4. 결과 파일</h3>
-      <table>
-        <thead><tr><th>파일</th><th>설명</th><th>사용 목적</th></tr></thead>
-        <tbody>
-          <tr>
-            <td><b>진급_업로드용(매칭행만)</b></td>
-            <td>매칭 성공한 행만 남김. 빈 열 자동 삭제.</td>
-            <td><b>e알리미 진급 페이지 업로드</b></td>
-          </tr>
-          <tr>
-            <td><b>진급_매칭리포트</b></td>
-            <td>파싱된 학년/반/번호와 상태 기록</td>
-            <td>검수 및 원인분석</td>
-          </tr>
-          <tr>
-            <td><b>진급누락목록</b></td>
-            <td>e알리미 명단 중 누락 + 진급명렬 중 누락</td>
-            <td>누락 보정/추적</td>
-          </tr>
-          <tr>
-            <td><b>롤백파일</b></td>
-            <td>업로드용 파일의 학년/반/번호를 원래대로 교환</td>
-            <td>잘못된 업로드 복구</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
+  
 
 <script>
 /* =========================
-   유틸리티 함수
+   0) 유틸
 ========================= */
 function clean(x){
   if (x === null || x === undefined) return "";
@@ -220,47 +158,68 @@ let cp949MapInitialized = false;
 
 async function initCP949Map() {
   if (cp949MapInitialized) return;
+  
+  // TextDecoder를 사용하여 CP949 -> 유니코드 매핑을 역으로 구축
   try {
     const decoder = new TextDecoder('euc-kr', { fatal: false });
+    
+    // CP949 바이트 범위 스캔
+    // 첫 바이트: 0x81-0xFE
+    // 두 번째 바이트: 0x41-0x5A, 0x61-0x7A, 0x81-0xFE
     for (let b1 = 0x81; b1 <= 0xFE; b1++) {
       for (let b2 = 0x41; b2 <= 0xFE; b2++) {
+        // 유효하지 않은 두 번째 바이트 스킵
         if (b2 > 0x5A && b2 < 0x61) continue;
         if (b2 > 0x7A && b2 < 0x81) continue;
+        
         const bytes = new Uint8Array([b1, b2]);
         const char = decoder.decode(bytes);
+        
+        // 유효한 문자이고 대체 문자가 아닌 경우
         if (char && char.length === 1 && char !== '\uFFFD' && char.charCodeAt(0) >= 0x80) {
           CP949_ENCODE_MAP.set(char, [b1, b2]);
         }
       }
     }
+    
     cp949MapInitialized = true;
+    console.log('CP949 매핑 테이블 초기화 완료:', CP949_ENCODE_MAP.size, '문자');
   } catch (e) {
     console.error('CP949 매핑 테이블 초기화 실패:', e);
   }
 }
+
+// 페이지 로드 시 CP949 테이블 초기화
 initCP949Map();
 
 function convertToCP949(str) {
   const result = [];
+  
   for (let i = 0; i < str.length; i++) {
     const char = str[i];
     const code = char.charCodeAt(0);
+    
     if (code < 0x80) {
+      // ASCII
       result.push(code);
     } else {
       const cp949Bytes = CP949_ENCODE_MAP.get(char);
       if (cp949Bytes) {
         result.push(cp949Bytes[0], cp949Bytes[1]);
       } else {
+        // 매핑되지 않는 문자는 '?'로 대체
         result.push(0x3F);
       }
     }
   }
+  
   return new Uint8Array(result);
 }
 
 /* =========================
-   e알리미 컬럼 찾기
+   5) e알리미 컬럼 찾기
+   - 학년/반: 2세트 필수
+   - 번호: 선택사항 (없으면 null)
 ========================= */
 function findEalimiColumns(headers){
   let nameIdx = null;
@@ -301,9 +260,10 @@ function findEalimiColumns(headers){
     cur_n = chosenNums[0];
     nxt_n = chosenNums[1];
   } else if(chosenNums.length === 1){
-    cur_n = null;
-    nxt_n = chosenNums[0];
+    cur_n = null;          // 현재번호 없음
+    nxt_n = chosenNums[0]; // 채울 대상(학급번호 등)
   } else {
+    // 번호 컬럼 없음 - nxt_n도 null
     cur_n = null;
     nxt_n = null;
   }
@@ -312,7 +272,7 @@ function findEalimiColumns(headers){
     nameIdx,
     cur_g: gradeIdxs[0], cur_c: classIdxs[0], cur_n,
     nxt_g: gradeIdxs[1], nxt_c: classIdxs[1], nxt_n,
-    hasNumColumn,
+    hasNumColumn, // 번호 컬럼 존재 여부 플래그 추가
     colNames: {
       name: headers[nameIdx],
       cur_g: headers[gradeIdxs[0]], cur_c: headers[classIdxs[0]],
@@ -324,26 +284,42 @@ function findEalimiColumns(headers){
 }
 
 /* =========================
-   학생이름 키 추출
+   6) 학교 진급명렬에서 학생이름 추출
 ========================= */
 function extractNameKeys(name) {
   const nameKeys = new Set();
   nameKeys.add(normCol(name));
+  
+  // 괄호 안의 이름도 추가
   const match = name.match(/$$([^)]+)$$/);
   if (match) {
     nameKeys.add(normCol(match[1]));
   }
+  
   return nameKeys;
 }
 
 /* =========================
-   학년 추출 (텍스트에서 숫자 파싱)
+   7) 학년 추출 (통합학교 지원: 초등/중학/중등/고등/전공)
 ========================= */
 function extractGrade(gradeStr) {
   const str = String(gradeStr || '').trim();
   if (!str) return null;
   
-  // 연도 패턴 제거
+  // "진급"만 있는 경우 (졸업 처리용)
+  if (str === "진급" || str === "졸업") {
+    return "졸업";
+  }
+  
+  // 1. 통합학교 형식 감지: "초등 1학년", "중학 2학년", "고등 3학년", "전공 1학년" 등
+  const integratedMatch = str.match(/(초등|중학|중등|고등|전공)\s*(\d+)\s*학년/);
+  if (integratedMatch) {
+    const schoolLevel = integratedMatch[1];
+    const gradeNum = parseInt(integratedMatch[2], 10);
+    return `${schoolLevel} ${gradeNum}학년`; // "초등 1학년", "중학 2학년" 등
+  }
+  
+  // 2. 연도 패턴 제거 (일반 학교용)
   let cleaned = str
     .replace(/20\d{2}\s*학년도?/g, ' ')
     .replace(/20\d{2}\s*년/g, ' ')
@@ -353,19 +329,19 @@ function extractGrade(gradeStr) {
     .replace(/^2[0-9]\s+/g, ' ')
     .trim();
   
-  // "N학년" 패턴 찾기
+  // 3. 정리된 문자열에서 "N학년" 패턴 찾기 (N이 1-6)
   const gradePattern = cleaned.match(/([1-6])\s*학년/);
   if (gradePattern) {
     return parseInt(gradePattern[1], 10);
   }
   
-  // 단독 숫자 1-6 찾기
+  // 4. "학년" 없이 단독 숫자 1-6 찾기
   const smallNum = cleaned.match(/(?:^|[^\d])([1-6])(?:[^\d]|$)/);
   if (smallNum) {
     return parseInt(smallNum[1], 10);
   }
   
-  // 모든 숫자 중 1-6 범위 찾기
+  // 5. 모든 숫자 중 1-6 범위 찾기
   const allNumbers = cleaned.match(/\d+/g);
   if (allNumbers) {
     for (const num of allNumbers) {
@@ -379,26 +355,133 @@ function extractGrade(gradeStr) {
   return null;
 }
 
-/* =========================
-   반 추출
-========================= */
-function extractClass(classStr) {
-  const str = String(classStr || '').trim();
-  const classMatch = str.match(/\d+/);
-  return classMatch ? parseInt(classMatch[0], 10) : null;
+// 학년 원본 값 추출 (진급학년용 - 숫자 변환 없이 원본 유지)
+function extractGradeRaw(gradeStr) {
+  const str = String(gradeStr || '').trim();
+  if (!str) return null;
+  
+  // "진급"/"졸업"만 있는 경우 null 반환 (채우지 않음)
+  if (str === "진급" || str === "졸업") {
+    return null;
+  }
+  
+  // 통합학교 형식: "초등 1학년", "중학 2학년" 등 그대로 반환
+  const integratedMatch = str.match(/(초등|중학|중등|고등|전공)\s*(\d+)\s*학년/);
+  if (integratedMatch) {
+    return `${integratedMatch[1]} ${integratedMatch[2]}학년`;
+  }
+  
+  // "N학년" 형태
+  const gradeMatch = str.match(/(\d+)\s*학년/);
+  if (gradeMatch) {
+    return gradeMatch[0];
+  }
+  
+  // 단순 숫자
+  if (/^\d+$/.test(str)) {
+    return str;
+  }
+  
+  return str;
+}
+
+// 매칭용 학년 키 생성 (학교급 + 학년을 정규화)
+function normalizeGradeKey(grade) {
+  if (grade === null || grade === undefined) return "-1";
+  if (grade === "졸업") return "졸업";
+  
+  // 문자열 형태 (통합학교: "초등 1학년", "중학 2학년" 등)
+  if (typeof grade === 'string') {
+    // 이미 정규화된 형태면 그대로 사용
+    const match = grade.match(/(초등|중학|중등|고등|전공)\s*(\d+)/);
+    if (match) {
+      // 중등과 중학을 동일하게 처리
+      const level = match[1] === "중등" ? "중학" : match[1];
+      return `${level}_${match[2]}`;
+    }
+    return grade;
+  }
+  
+  // 숫자 형태 (일반 학교)
+  return String(grade);
+}
+
+// 졸업학년 여부 판정
+function isGraduationGrade(grade, graduationGrades) {
+  if (grade === null || grade === undefined) return false;
+  if (grade === "졸업") return true;
+  
+  const gKey = normalizeGradeKey(grade);
+  return graduationGrades.includes(gKey);
 }
 
 /* =========================
-   번호 추출
+   8) 반 추출 (숫자 또는 한글 반 지원)
+========================= */
+function extractClass(classStr) {
+  const str = String(classStr || '').trim();
+  if (!str) return null;
+  
+  // 1. 숫자 반 (1, 2, 3 또는 "1반", "2반" 등)
+  const numMatch = str.match(/(\d+)\s*반?/);
+  if (numMatch) {
+    return parseInt(numMatch[1], 10);
+  }
+  
+  // 2. 한글 반 (가, 나, 다, 라, 마, 바, 사 등)
+  const koreanClassMatch = str.match(/([가나다라마바사아자차카타파하])\s*반?/);
+  if (koreanClassMatch) {
+    return koreanClassMatch[1]; // 한글 문자 그대로 반환
+  }
+  
+  // 3. 단독 숫자
+  const singleNum = str.match(/\d+/);
+  if (singleNum) {
+    return parseInt(singleNum[0], 10);
+  }
+  
+  // 4. 단독 한글 반 문자
+  const singleKorean = str.match(/^[가나다라마바사아자차카타파하]$/);
+  if (singleKorean) {
+    return singleKorean[0];
+  }
+  
+  return null;
+}
+
+// 진급반 원본 값 추출 (숫자로 변환하지 않고 원본 유지)
+function extractClassRaw(classStr) {
+  const str = String(classStr || '').trim();
+  if (!str) return null;
+  
+  // "N반" 형태에서 N 추출 (숫자 또는 한글)
+  const classMatch = str.match(/^(\d+|[가나다라마바사아자차카타파하])\s*반?$/);
+  if (classMatch) {
+    return classMatch[1];
+  }
+  
+  // 그냥 숫자나 한글 문자만 있는 경우
+  if (/^\d+$/.test(str)) {
+    return str;
+  }
+  if (/^[가나다라마바사아자차카타파하]$/.test(str)) {
+    return str;
+  }
+  
+  // 원본 그대로 반환
+  return str;
+}
+
+/* =========================
+   9) 번호 추출
 ========================= */
 function extractNo(noStr) {
-  const str = String(noStr || '').trim();
-  const noMatch = str.match(/\d+/);
+  const noMatch = noStr.match(/\d+/);
   return noMatch ? parseInt(noMatch[0], 10) : null;
 }
 
 /* =========================
-   상태 설정
+   10) 상태 설정
 ========================= */
 function setStatus(status) {
   document.getElementById('runStatus').innerHTML = status;
@@ -410,22 +493,68 @@ function checkFilesAndEnableRun() {
   document.getElementById('runBtn').disabled = !(schoolFile && ealimiFile);
 }
 
-document.getElementById('schoolFile').addEventListener('change', function() {
+document.getElementById('schoolFile').addEventListener('change', async function() {
   const file = this.files[0];
+  const infoEl = document.getElementById('schoolInfo');
+  
   if (file) {
-    document.getElementById('schoolInfo').innerHTML = `<span class="ok">파일 선택됨: ${file.name}</span>`;
+    infoEl.innerHTML = '<span style="color:#666;">파일 검증 중...</span>';
+    try {
+      const data = await parseFile(file);
+      const colCount = data.headers.length;
+      
+      if (colCount < 7) {
+        infoEl.innerHTML = `<span class="err">오류: 컬럼이 ${colCount}개입니다. 진급명렬은 7개 컬럼이 필요합니다.<br/>(학생이름, 이전학년, 이전반, 이전번호, 진급학년, 진급반, 진급번호)</span>`;
+        this.value = ''; // 파일 선택 해제
+        checkFilesAndEnableRun();
+        return;
+      }
+      
+      infoEl.innerHTML = `<span class="ok">파일 선택됨: ${file.name} (${colCount}개 컬럼, ${data.rows.length}행)</span>`;
+    } catch (err) {
+      infoEl.innerHTML = `<span class="err">오류: 파일을 읽을 수 없습니다. (${err.message})</span>`;
+      this.value = '';
+    }
   } else {
-    document.getElementById('schoolInfo').innerHTML = '';
+    infoEl.innerHTML = '';
   }
   checkFilesAndEnableRun();
 });
 
-document.getElementById('ealimiFile').addEventListener('change', function() {
+document.getElementById('ealimiFile').addEventListener('change', async function() {
   const file = this.files[0];
+  const infoEl = document.getElementById('ealimiInfo');
+  
   if (file) {
-    document.getElementById('ealimiInfo').innerHTML = `<span class="ok">파일 선택됨: ${file.name}</span>`;
+    infoEl.innerHTML = '<span style="color:#666;">파일 검증 중...</span>';
+    try {
+      const data = await parseFile(file);
+      const headers = data.headers;
+      
+      // 학년/반 컬럼 개수 확인
+      let gradeCount = 0;
+      let classCount = 0;
+      
+      for (const h of headers) {
+        const nc = normCol(h);
+        if (nc.includes("학년") && !nc.includes("신") && !nc.includes("학년도")) gradeCount++;
+        if (nc.includes("반") && !nc.includes("신") && !nc.includes("반장")) classCount++;
+      }
+      
+      if (gradeCount < 2 || classCount < 2) {
+        infoEl.innerHTML = `<span class="err">오류: 학년 컬럼 ${gradeCount}개, 반 컬럼 ${classCount}개 감지됨.<br/>e알리미 양식은 학년/반 컬럼이 각각 2개 이상 필요합니다.</span>`;
+        this.value = '';
+        checkFilesAndEnableRun();
+        return;
+      }
+      
+      infoEl.innerHTML = `<span class="ok">파일 선택됨: ${file.name} (학년 ${gradeCount}개, 반 ${classCount}개 컬럼, ${data.rows.length}행)</span>`;
+    } catch (err) {
+      infoEl.innerHTML = `<span class="err">오류: 파일을 읽을 수 없습니다. (${err.message})</span>`;
+      this.value = '';
+    }
   } else {
-    document.getElementById('ealimiInfo').innerHTML = '';
+    infoEl.innerHTML = '';
   }
   checkFilesAndEnableRun();
 });
@@ -446,25 +575,7 @@ document.getElementById('resetBtn').addEventListener('click', function() {
 });
 
 /* =========================
-   빈 컬럼 제거
-========================= */
-function removeEmptyColumns(headers, rows) {
-  const colHasData = headers.map((_, colIdx) => {
-    return rows.some(row => {
-      const val = row[colIdx];
-      return val !== null && val !== undefined && String(val).trim() !== '';
-    });
-  });
-  
-  const keepIndices = colHasData.map((has, idx) => has ? idx : -1).filter(idx => idx !== -1);
-  const newHeaders = keepIndices.map(idx => headers[idx]);
-  const newRows = rows.map(row => keepIndices.map(idx => row[idx]));
-  
-  return { headers: newHeaders, rows: newRows };
-}
-
-/* =========================
-   메인 로직
+   11) 메인 로직
 ========================= */
 document.getElementById('runBtn').addEventListener('click', async () => {
   const schoolFile = document.getElementById('schoolFile').files[0];
@@ -493,69 +604,108 @@ document.getElementById('runBtn').addEventListener('click', async () => {
     
     for (let i = 0; i < dataRows0.length; i++) {
       const row = dataRows0[i];
+      // row가 배열인지 확인
       if (!Array.isArray(row)) continue;
       
+      // 7개 컬럼까지 패딩
       while (row.length < 7) row.push("");
       
-      const name = clean(row[0]);
-      // 텍스트에서도 숫자 추출 ("1학년" -> 1, "1반" -> 1)
-      const prevGrade = extractGrade(String(row[1] || ''));
-      const prevClass = extractClass(String(row[2] || ''));
-      const prevNum = extractNo(String(row[3] || ''));
-      const nextGrade = extractGrade(String(row[4] || ''));
-      const nextClass = extractClass(String(row[5] || ''));
-      const nextNum = extractNo(String(row[6] || ''));
+const name = clean(row[0]);
+  // 통합학교 형식("초등 1학년", "중학 2학년" 등)도 지원
+  const prevGrade = extractGrade(String(row[1] || ''));
+  const prevClass = extractClass(String(row[2] || ''));
+  const prevNum = extractNo(String(row[3] || ''));
+  const nextGradeRaw = extractGradeRaw(String(row[4] || '')); // 진급학년은 원본 값 유지
+  const nextClass = extractClassRaw(String(row[5] || '')); // 진급반은 원본 값 유지 (가, 나, 다 등)
+  const nextNum = extractNo(String(row[6] || ''));
+  
+  if (!name) continue;
+  // 졸업인 경우도 유효 (nextGradeRaw가 null이 됨)
+  if (prevGrade === null && prevGrade !== "졸업" && nextGradeRaw === null) continue;
       
-      if (!name) continue;
-      if (prevGrade === null && nextGrade === null) continue;
-      
-      const nameKeys = extractNameKeys(name);
-      const g = prevGrade !== null ? prevGrade : -1;
-      const c = prevClass !== null ? prevClass : -1;
-      
-      const studentData = {
-        "_rowId": i,
-        "학생이름": name,
-        "이전학년": prevGrade,
-        "이전반": prevClass,
-        "이전번호": prevNum,
-        "진급학년": nextGrade,
-        "진급반": nextClass,
-        "진급번호": nextNum
-      };
-      
-      for (const nk of nameKeys) {
-        if (prevNum !== null) {
-          const keyFull = `${nk}_${g}_${c}_${prevNum}`;
-          if (!fullLookup.has(keyFull)) {
-            fullLookup.set(keyFull, studentData);
-          }
-        }
-        const keyPart = `${nk}_${g}_${c}`;
-        if (!partLookup.has(keyPart)) {
-          partLookup.set(keyPart, studentData);
-        }
-      }
-    }
+const nameKeys = extractNameKeys(name);
+  // 매칭용 학년 키 (통합학교: "초등_1", "중학_2" 등 / 일반학교: "1", "2" 등)
+  const gKey = normalizeGradeKey(prevGrade);
+  const c = prevClass !== null ? prevClass : -1;
+  
+  const studentData = {
+  "_rowId": i,
+  "학생이름": name,
+  "이전학년": prevGrade,
+  "이전반": prevClass,
+  "이전번호": prevNum,
+  "진급학년": nextGradeRaw, // 원본 값 유지 ("초등 2학년", "중학 1학년" 등)
+  "진급반": nextClass,
+  "진급번호": nextNum
+  };
+  
+  for (const nk of nameKeys) {
+  // 번호 포함 키
+  if (prevNum !== null) {
+  const keyFull = `${nk}_${gKey}_${c}_${prevNum}`;
+  if (!fullLookup.has(keyFull)) {
+  fullLookup.set(keyFull, studentData);
+  }
+  }
+  // 번호 미포함 키
+  const keyPart = `${nk}_${gKey}_${c}`;
+  if (!partLookup.has(keyPart)) {
+  partLookup.set(keyPart, studentData);
+  }
+  }
+  }
     
-    const hasSchoolNextNum = dataRows0.some(r => Array.isArray(r) && r.length >= 7 && extractNo(String(r[6] || '')) !== null);
+// fullLookup/partLookup 생성 완료
+    
+    // 학교 진급명렬에 진급번호가 있는지 확인
+    const hasSchoolNextNum = dataRows0.some(r => Array.isArray(r) && r.length >= 7 && toIntOrNull(r[6]) !== null);
+    // 양쪽 조건 모두 만족해야 번호를 채움
     const shouldFillNumber = pos.hasNumColumn && pos.nxt_n !== null && hasSchoolNextNum;
 
+    // 3) 매칭 + 채우기
     const report = [];
     const eOutRows = [];
     const matchedSchoolRowIds = new Set();
     
-    // 졸업학년 판정 (4/5학년 존재 여부로 결정)
-    let has4or5Grade = false;
-    for (const row of dataRows1) {
-      if (!Array.isArray(row)) continue;
-      const g = extractGrade(String(row[pos.cur_g] || ''));
-      if (g === 4 || g === 5) {
-        has4or5Grade = true;
-        break;
-      }
+// 졸업학년 판정 (통합학교 지원)
+  // 학교 유형 감지: 통합학교(초등/중학/고등/전공) vs 일반학교(1-6학년)
+  let schoolType = "일반"; // "일반" 또는 "통합"
+  let hasIntegratedGrade = false;
+  let has4or5Grade = false;
+  
+  for (const row of dataRows1) {
+    if (!Array.isArray(row)) continue;
+    const gStr = String(row[pos.cur_g] || '');
+    const g = extractGrade(gStr);
+    
+    // 통합학교 형식 감지
+    if (typeof g === 'string' && (g.includes('초등') || g.includes('중학') || g.includes('중등') || g.includes('고등') || g.includes('전공'))) {
+      hasIntegratedGrade = true;
     }
-    const graduationGrade = has4or5Grade ? 6 : 3;
+    
+    // 일반학교 4/5학년 감지
+    if (typeof g === 'number' && (g === 4 || g === 5)) {
+      has4or5Grade = true;
+    }
+  }
+  
+  // 통합학교는 각 학교급의 최고 학년이 졸업학년
+  // 일반학교는 4/5학년 존재 여부로 결정
+  let graduationGrades = []; // 졸업학년 목록
+  let graduationGradeDisplay = "";
+  
+  if (hasIntegratedGrade) {
+    schoolType = "통합";
+    // 통합학교: 초등6, 중학3, 고등3, 전공2가 졸업학년
+    graduationGrades = ["초등_6", "중학_3", "중등_3", "고등_3", "전공_2"];
+    graduationGradeDisplay = "초등6/중학3/고등3/전공2";
+  } else {
+    schoolType = "일반";
+    // 일반학교: 4/5학년 있으면 6학년, 없으면 3학년
+    const maxGrade = has4or5Grade ? 6 : 3;
+    graduationGrades = [String(maxGrade)];
+    graduationGradeDisplay = `${maxGrade}학년`;
+  }
     
     let graduationCount = 0;
     
@@ -566,53 +716,101 @@ document.getElementById('runBtn').addEventListener('click', async () => {
       const rawName = row[pos.nameIdx];
       const nameKeys = Array.from(extractNameKeys(rawName || ''));
       
-      const g = extractGrade(String(row[pos.cur_g] || ''));
-      const c = extractClass(String(row[pos.cur_c] || ''));
-      const n = (pos.cur_n === null ? null : extractNo(String(row[pos.cur_n] || '')));
+const g = extractGrade(String(row[pos.cur_g] || ''));
+  const c = extractClass(String(row[pos.cur_c] || ''));
+  const n = (pos.cur_n === null ? null : extractNo(String(row[pos.cur_n] || '')));
+  
+  // 매칭용 키 생성 (통합학교 지원)
+  const gKey = normalizeGradeKey(g);
+  const c2 = (c !== null && c !== undefined) ? c : -1;
+  
+let status = "미매칭";
+  let matched = null;
+  
+  // 졸업학년 여부 확인 (나중에 매칭 결과에 따라 졸업/진급 결정)
+  const isPotentialGraduation = (g === "졸업" || isGraduationGrade(g, graduationGrades));
+  
+  // 1. 먼저 매칭 시도 (번호 포함)
+  if(n !== null && nameKeys.length){
+  for(const nk of nameKeys){
+  const kf = `${nk}_${gKey}_${c2}_${n}`;
+  if(fullLookup.has(kf)){
+  matched = fullLookup.get(kf);
+  status = "매칭(번호포함-이름확장)";
+  break;
+  }
+  }
+  }
+  
+  // 2. 번호 없이 매칭 시도
+  if(!matched && nameKeys.length){
+  for(const nk of nameKeys){
+  const kp = `${nk}_${gKey}_${c2}`;
+  if(partLookup.has(kp)){
+  matched = partLookup.get(kp);
+  status = "매칭(번호없음-이름확장)";
+  break;
+  }
+  }
+  }
+  
+  // 3. 졸업 판정: 졸업학년이고 매칭되지 않았거나, 매칭되었어도 진급학년/반 데이터가 없는 경우
+  if (isPotentialGraduation) {
+    if (!matched) {
+      // 매칭 안 됨 -> 졸업
+      graduationCount++;
+      status = "졸업";
+    } else {
+      // 매칭됨 -> 진급 데이터 확인
+      const hasNextGrade = matched["진급학년"] !== null && matched["진급학년"] !== undefined && matched["진급학년"] !== "";
+      const hasNextClass = matched["진급반"] !== null && matched["진급반"] !== undefined && matched["진급반"] !== "";
       
-      const g2 = Number.isFinite(g) ? g : -1;
-      const c2 = Number.isFinite(c) ? c : -1;
-      
-      let status = "미매칭";
-      let matched = null;
-      
-      if (g !== null && g >= graduationGrade) {
+      if (!hasNextGrade && !hasNextClass) {
+        // 진급 데이터 없음 -> 졸업 (매칭은 됐지만 진급정보 없음)
         graduationCount++;
         status = "졸업";
+        matched = null; // 매칭 취소
       }
+      // else: 진급 데이터 있음 -> 진급으로 처리 (status는 이미 "매칭..."으로 설정됨)
+    }
+  }
+  
+  if(!nameKeys.length && status !== "졸업") status = "미매칭(이름키없음)";
       
-      if(status !== "졸업" && n !== null && nameKeys.length){
-        for(const nk of nameKeys){
-          const kf = `${nk}_${g2}_${c2}_${n}`;
-          if(fullLookup.has(kf)){
-            matched = fullLookup.get(kf);
-            status = "매칭(번호포함-이름확장)";
-            break;
-          }
-        }
-      }
-      
-      if(status !== "졸업" && !matched && nameKeys.length){
-        for(const nk of nameKeys){
-          const kp = `${nk}_${g2}_${c2}`;
-          if(partLookup.has(kp)){
-            matched = partLookup.get(kp);
-            status = "매칭(번호없음-이름확장)";
-            break;
-          }
-        }
-      }
-      
-      if(!nameKeys.length && status !== "졸업") status = "미매칭(이름키없음)";
-      
-      if(matched){
-        row[pos.nxt_g] = matched["진급학년"] ?? "";
-        row[pos.nxt_c] = matched["진급반"] ?? "";
-        if(shouldFillNumber && pos.nxt_n !== null){
-          row[pos.nxt_n] = matched["진급번호"] ?? "";
-        }
-        matchedSchoolRowIds.add(matched["_rowId"]);
-      }
+if(matched){
+  // 진급학년: "26년 N학년" 또는 "26년 초등 N학년" 형식으로 포맷팅
+  const rawGrade = matched["진급학년"];
+  if (rawGrade !== null && rawGrade !== undefined && rawGrade !== "") {
+    const gradeStr = String(rawGrade);
+    // 통합학교 형식 확인: "초등 2학년", "중학 1학년" 등
+    const integratedMatch = gradeStr.match(/(초등|중학|중등|고등|전공)\s*(\d+)/);
+    if (integratedMatch) {
+      // 통합학교: "26년 초등 2학년" 형식
+      row[pos.nxt_g] = `26년 ${integratedMatch[1]} ${integratedMatch[2]}학년`;
+    } else {
+      // 일반학교: 숫자만 추출하여 "26년 N학년" 형식
+      const gradeNum = gradeStr.match(/\d+/);
+      row[pos.nxt_g] = gradeNum ? `26년 ${gradeNum[0]}학년` : gradeStr;
+    }
+  } else {
+    row[pos.nxt_g] = "";
+  }
+  
+  // 진급반: "N반" 형식으로 포맷팅
+  const rawClass = matched["진급반"];
+  if (rawClass !== null && rawClass !== undefined && rawClass !== "") {
+    // 이미 "반"이 포함되어 있으면 그대로, 아니면 "반" 추가
+    const classStr = String(rawClass);
+    row[pos.nxt_c] = classStr.includes("반") ? classStr : `${classStr}반`;
+  } else {
+    row[pos.nxt_c] = "";
+  }
+  
+  if(shouldFillNumber && pos.nxt_n !== null){
+  row[pos.nxt_n] = matched["진급번호"] ?? "";
+  }
+  matchedSchoolRowIds.add(matched["_rowId"]);
+  }
       
       report.push({
         "학생이름(원본)": rawName ?? "",
@@ -632,38 +830,53 @@ document.getElementById('runBtn').addEventListener('click', async () => {
     const matchedCount = report.filter(r => startsWithMatched(r["상태"])).length;
     const unmatchedCount = total - matchedCount - graduationCount;
     
-    setStatus(`<span class="ok">완료</span> | 졸업학년: <b>${graduationGrade}학년</b> | 총 ${total}건 / 매칭 ${matchedCount}건 / 미매칭 ${unmatchedCount}건 / 졸업 ${graduationCount}건${shouldFillNumber ? "" : " | <span style='color:#666;'>번호컬럼 미채움</span>"}`);
-    document.getElementById('resultSummary').innerHTML = `
-      <div><b>완료</b></div>
-      <div>졸업학년 판정: <b>${graduationGrade}학년</b> (${has4or5Grade ? "4/5학년 있음 → 6학년" : "4/5학년 없음 → 3학년"})</div>
-      <div>총 <b>${total}</b>건 / 매칭 <b>${matchedCount}</b>건 / 미매칭 <b>${unmatchedCount}</b>건 / 졸업 <b>${graduationCount}</b>건</div>
-      ${shouldFillNumber ? "" : "<div class='small' style='color:#888;'>※ e알리미 양식에 번호컬럼이 없거나, 진급명렬에 진급번호가 없어 번호는 채우지 않았습니다.</div>"}
-      <div class="small" style="margin-top:8px;">
-        인식된 e알리미 컬럼: 이름(${clean(pos.colNames.name)}), 현재(${clean(pos.colNames.cur_g)} / ${clean(pos.colNames.cur_c)} / ${clean(pos.colNames.cur_n)}), 채움대상(${clean(pos.colNames.nxt_g)} / ${clean(pos.colNames.nxt_c)} / ${clean(pos.colNames.nxt_n)})
-      </div>
-    `;
+setStatus(`<span class="ok">완료</span> | 학교유형: <b>${schoolType}</b> | 졸업학년: <b>${graduationGradeDisplay}</b> | 총 ${total}건 / 매칭 ${matchedCount}건 / 미매칭 ${unmatchedCount}건 / 졸업 ${graduationCount}건${shouldFillNumber ? "" : " | <span style='color:#666;'>번호컬럼 미채움</span>"}`);
+  document.getElementById('resultSummary').innerHTML = `
+  <div><b>완료</b></div>
+  <div>학교유형: <b>${schoolType}</b> | 졸업학년: <b>${graduationGradeDisplay}</b></div>
+  <div>총 <b>${total}</b>건 / 매칭 <b>${matchedCount}</b>건 / 미매칭 <b>${unmatchedCount}</b>건 / 졸업 <b>${graduationCount}</b>건</div>
+  ${shouldFillNumber ? "" : "<div class='small' style='color:#888;'>※ e알리미 양식에 번호컬럼이 없거나, 진급명렬에 진급번호가 없어 번호는 채우지 않았습니다.</div>"}
+  <div class="small" style="margin-top:8px;">
+  인식된 e알리미 컬럼: 이름(${clean(pos.colNames.name)}), 현재(${clean(pos.colNames.cur_g)} / ${clean(pos.colNames.cur_c)} / ${clean(pos.colNames.cur_n)}), 채움대상(${clean(pos.colNames.nxt_g)} / ${clean(pos.colNames.nxt_c)} / ${clean(pos.colNames.nxt_n)})
+  </div>
+  `;
+
+    const missingFromSchool = [];
+    for (let i = 0; i < dataRows0.length; i++) {
+      if (!matchedSchoolRowIds.has(i)) {
+        const row = dataRows0[i];
+        if (Array.isArray(row) && row.length >= 1 && clean(row[0])) {
+          missingFromSchool.push(row);
+        }
+      }
+    }
 
     const timestamp = nowStamp();
     const uploadHeaders = headers1.map(stripPandasDupSuffix);
     const reportHeaders = Object.keys(report[0] || {});
     const schoolHeaders = headers0.map(stripPandasDupSuffix);
     
+    // 매칭된 행만 필터링
     const matchedRows = eOutRows.filter((r, idx) => startsWithMatched(report[idx]["상태"]));
     
     let rollbackHeaders = uploadHeaders.slice();
     let rollbackRows = [];
     
     if (pos.nxt_n !== null && pos.cur_n === null) {
+      // 번호 컬럼이 뒤쪽에만 있는 경우 - 컬럼 재배열 필요
+      // 번호 컬럼을 nxt_n 위치에서 cur_c+1 위치로 이동
       const numColIdx = pos.nxt_n;
-      const insertIdx = pos.cur_c + 1;
+      const insertIdx = pos.cur_c + 1; // 현재반 다음 위치
       
+      // 헤더 재배열
       const numHeader = rollbackHeaders[numColIdx];
-      rollbackHeaders.splice(numColIdx, 1);
-      rollbackHeaders.splice(insertIdx, 0, numHeader);
+      rollbackHeaders.splice(numColIdx, 1); // 기존 위치에서 제거
+      rollbackHeaders.splice(insertIdx, 0, numHeader); // 새 위치에 삽입
       
       rollbackRows = matchedRows.map(row => {
         const newRow = row.slice();
         
+        // 1. 값 교환 (학년, 반)
         const tempG = newRow[pos.cur_g];
         const tempC = newRow[pos.cur_c];
         newRow[pos.cur_g] = newRow[pos.nxt_g];
@@ -671,21 +884,26 @@ document.getElementById('runBtn').addEventListener('click', async () => {
         newRow[pos.nxt_g] = tempG;
         newRow[pos.nxt_c] = tempC;
         
+        // 2. 번호 컬럼 위치 재배열
         const numValue = newRow[numColIdx];
-        newRow.splice(numColIdx, 1);
-        newRow.splice(insertIdx, 0, numValue);
+        newRow.splice(numColIdx, 1); // 기존 위치에서 제거
+        newRow.splice(insertIdx, 0, numValue); // 새 위치에 삽입
         
         return newRow;
       });
     } else {
+      // 번호 컬럼이 양쪽에 있거나 없는 경우 - 기존 로직 (값만 교환)
       rollbackRows = matchedRows.map(row => {
         const newRow = row.slice();
+        // 학년 교환
         const tempG = newRow[pos.cur_g];
         newRow[pos.cur_g] = newRow[pos.nxt_g];
         newRow[pos.nxt_g] = tempG;
+        // 반 교환
         const tempC = newRow[pos.cur_c];
         newRow[pos.cur_c] = newRow[pos.nxt_c];
         newRow[pos.nxt_c] = tempC;
+        // 번호 교환 (두 개 다 있으면)
         if (pos.cur_n !== null && pos.nxt_n !== null) {
           const tempN = newRow[pos.cur_n];
           newRow[pos.cur_n] = newRow[pos.nxt_n];
@@ -695,9 +913,11 @@ document.getElementById('runBtn').addEventListener('click', async () => {
       });
     }
     
+    // 헤더: 구분, 학생이름, 현재학년, 현재반, 현재번호, 파싱학년, 파싱반, 파싱번호, 상태, 이전학년, 이전반, 이전번호, 진급학년, 진급반, 진급번호
     const missingHeaders = ["구분", "학생이름", "현재학년", "현재반", "현재번호", "파싱학년", "파싱반", "파싱번호", "상태", "이전학년", "이전반", "이전번호", "진급학년", "진급반", "진급번호"];
     const missingRows = [];
     
+    // 1) e알리미 명단 중 누락 (미매칭이며 졸업생 제외)
     for (let i = 0; i < report.length; i++) {
       const r = report[i];
       const status = r["상태"];
@@ -713,33 +933,36 @@ document.getElementById('runBtn').addEventListener('click', async () => {
           r["파싱반"] ?? "",
           r["파싱번호"] ?? "",
           r["상태"] ?? "",
-          "", "", "", "", "", ""
+          "", "", "", "", "", "" // 이전학년~진급번호는 빈칸
         ]);
       }
     }
     
+    // 2) 진급명렬 중 누락 (진급명렬에 있으나 양식에서 매칭되지 않은 학생)
     for (let i = 0; i < dataRows0.length; i++) {
       if (!matchedSchoolRowIds.has(i)) {
         const row = dataRows0[i];
         if (Array.isArray(row) && row.length >= 1 && clean(row[0])) {
+          // row 구조: [학생이름, 이전학년, 이전반, 이전번호, 진급학년, 진급반, 진급번호]
           while(row.length < 7) row.push("");
           missingRows.push([
             "진급명렬 중 누락",
-            row[0] ?? "",
-            "", "", "",
-            "", "", "",
+            row[0] ?? "", // 학생이름
+            "", "", "", // 현재학년, 현재반, 현재번호 (e알리미에 없으므로 빈칸)
+            "", "", "", // 파싱학년, 파싱반, 파싱번호 (e알리미에 없으므로 빈칸)
             "미매칭(양식에 없음/불일치)",
-            row[1] ?? "",
-            row[2] ?? "",
-            row[3] ?? "",
-            row[4] ?? "",
-            row[5] ?? "",
-            row[6] ?? ""
+            row[1] ?? "", // 이전학년
+            row[2] ?? "", // 이전반
+            row[3] ?? "", // 이전번호
+            row[4] ?? "", // 진급학년
+            row[5] ?? "", // 진급반
+            row[6] ?? ""  // 진급번호
           ]);
         }
       }
     }
 
+    // 다운로드 버튼 이벤트 설정
     const dlUploadBtn = document.getElementById('dlUpload');
     const dlReportBtn = document.getElementById('dlReport');
     const dlMissingBtn = document.getElementById('dlMissing');
@@ -789,61 +1012,83 @@ document.getElementById('runBtn').addEventListener('click', async () => {
 
   } catch (err) {
     setStatus(`<span class="err">오류: ${err.message}</span>`);
-    console.error('Error:', err);
+    console.error('[v0] Error:', err);
   }
 });
 
 async function parseFile(file) {
   return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const data = new Uint8Array(e.target.result);
-        const isCSV = file.name.toLowerCase().endsWith('.csv');
+  const reader = new FileReader();
+  reader.onload = (e) => {
+  try {
+  const data = new Uint8Array(e.target.result);
+  const isCSV = file.name.toLowerCase().endsWith('.csv');
+  
+  let workbook;
+  if (isCSV) {
+    // CSV 파일: EUC-KR 인코딩 시도
+    const decoder = new TextDecoder('euc-kr');
+    const textEucKr = decoder.decode(data);
+    
+    // UTF-8로도 시도
+    const decoderUtf8 = new TextDecoder('utf-8');
+    const textUtf8 = decoderUtf8.decode(data);
+    
+    // 한글이 제대로 디코딩되었는지 확인 (깨진 문자 여부)
+    const hasValidKoreanEucKr = /[가-힣]/.test(textEucKr);
+    const hasValidKoreanUtf8 = /[가-힣]/.test(textUtf8);
+    const hasGarbageUtf8 = /[\uFFFD]/.test(textUtf8) || /[Ã¤Ã¥Ã¦Ã§Ã¨Ã©]/.test(textUtf8);
+    
+    // EUC-KR이 한글을 포함하고, UTF-8이 깨졌거나 한글이 없으면 EUC-KR 사용
+    const text = (hasValidKoreanEucKr && (!hasValidKoreanUtf8 || hasGarbageUtf8)) ? textEucKr : textUtf8;
+    
+    workbook = XLSX.read(text, { type: 'string' });
+  } else {
+    // Excel 파일: 기본 처리
+    workbook = XLSX.read(data, { type: 'array' });
+  }
+  
+  const sheetName = workbook.SheetNames[0];
+  const worksheet = workbook.Sheets[sheetName];
+  const json = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+  
+  let headerRowIdx = 0;
+  
+  // 헤더 행 찾기: 키워드 포함 + 충분한 컬럼 수 (병합된 제목 행 무시)
+  for (let i = 0; i < Math.min(json.length, 15); i++) {
+    const row = json[i];
+    if (!row) continue;
+    
+    // 유효한 컬럼 개수 (빈 값이 아닌 컬럼)
+    const validColCount = row.filter(cell => cell !== null && cell !== undefined && String(cell).trim() !== '').length;
+    
+    // 3개 이상의 유효한 컬럼이 있어야 헤더 행으로 인정
+    if (validColCount < 3) continue;
+    
+    const rowStr = row.join(' ').toLowerCase();
+    if (rowStr.includes('이름') || rowStr.includes('학생') || rowStr.includes('성명') || rowStr.includes('학년') || rowStr.includes('번호')) {
+      headerRowIdx = i;
+      break;
+    }
+  }
+  
+  // 키워드로 못 찾았으면 7개 이상 컬럼이 있는 첫 번째 행을 헤더로 사용 (진급명렬용)
+  if (headerRowIdx === 0) {
+    for (let i = 0; i < Math.min(json.length, 15); i++) {
+      const row = json[i];
+      if (!row) continue;
+      const validColCount = row.filter(cell => cell !== null && cell !== undefined && String(cell).trim() !== '').length;
+      if (validColCount >= 7) {
+        headerRowIdx = i;
+        break;
+      }
+    }
+  }
         
-        let workbook;
-        if (isCSV) {
-          // CSV 파일: EUC-KR 인코딩 시도
-          const decoder = new TextDecoder('euc-kr');
-          const textEucKr = decoder.decode(data);
-          
-          // UTF-8로도 시도
-          const decoderUtf8 = new TextDecoder('utf-8');
-          const textUtf8 = decoderUtf8.decode(data);
-          
-          // 한글이 제대로 디코딩되었는지 확인
-          const hasValidKoreanEucKr = /[가-힣]/.test(textEucKr);
-          const hasValidKoreanUtf8 = /[가-힣]/.test(textUtf8);
-          const hasGarbageUtf8 = /[\uFFFD]/.test(textUtf8) || /[Ã¤Ã¥Ã¦Ã§Ã¨Ã©]/.test(textUtf8);
-          
-          // EUC-KR이 한글을 포함하고, UTF-8이 깨졌거나 한글이 없으면 EUC-KR 사용
-          const text = (hasValidKoreanEucKr && (!hasValidKoreanUtf8 || hasGarbageUtf8)) ? textEucKr : textUtf8;
-          
-          workbook = XLSX.read(text, { type: 'string' });
-        } else {
-          // Excel 파일: 기본 처리
-          workbook = XLSX.read(data, { type: 'array' });
-        }
-        
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
-        const json = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-        
-        let headerRowIdx = 0;
-        for (let i = 0; i < Math.min(json.length, 10); i++) {
-          const row = json[i];
-          if (!row) continue;
-          const rowStr = row.join(' ').toLowerCase();
-          if (rowStr.includes('이름') || rowStr.includes('학생') || rowStr.includes('성명') || rowStr.includes('학년')) {
-            headerRowIdx = i;
-            break;
-          }
-        }
-        
-        const headers = json[headerRowIdx] || [];
-        const rows = json.slice(headerRowIdx + 1).filter(row => row && row.length > 0);
-        
-        resolve({ headers, rows });
+  const headers = json[headerRowIdx] || [];
+  const rows = json.slice(headerRowIdx + 1).filter(row => row && row.length > 0);
+  
+  resolve({ headers, rows });
       } catch (err) {
         reject(err);
       }
@@ -864,6 +1109,7 @@ function downloadCsv(filename, rows, headers, withBom){
   
   let blob;
   if (withBom) {
+    // 리포트/누락목록: UTF-8 BOM 포함 (엑셀에서 UTF-8로 인식)
     const content = "\ufeff" + csv;
     blob = new Blob([content], {type:"text/csv;charset=utf-8;"});
   } else {
@@ -877,6 +1123,57 @@ function downloadCsv(filename, rows, headers, withBom){
   document.body.appendChild(a); a.click(); a.remove();
   URL.revokeObjectURL(url);
 }
+
+function downloadRollbackCsv(filename, rows, headers) {
+  const rollbackRows = rows.map(row => {
+    const newRow = [...row];
+    const temp = newRow[headers.indexOf("학년")];
+    newRow[headers.indexOf("학년")] = newRow[headers.indexOf("학년.1")];
+    newRow[headers.indexOf("학년.1")] = temp;
+
+    const tempClass = newRow[headers.indexOf("반")];
+    newRow[headers.indexOf("반")] = newRow[headers.indexOf("반.1")];
+    newRow[headers.indexOf("반.1")] = tempClass;
+
+    const tempNum = newRow[headers.indexOf("번호")];
+    newRow[headers.indexOf("번호")] = newRow[headers.indexOf("번호.1")];
+    newRow[headers.indexOf("번호.1")] = tempNum;
+
+    return newRow;
+  });
+
+  const timestamp = nowStamp();
+  const rollbackHeaders = headers.map(stripPandasDupSuffix);
+  
+  const csv = Papa.unparse([rollbackHeaders, ...rollbackRows], { quotes: false });
+  const blob = new Blob([csv], {type:"text/csv;charset=utf-8;"});
+  
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+}
+
+function removeEmptyColumns(headers, rows) {
+  // 각 컬럼별로 데이터가 있는지 확인
+  const colHasData = headers.map((_, colIdx) => {
+    return rows.some(row => {
+      const val = row[colIdx];
+      return val !== null && val !== undefined && String(val).trim() !== '';
+    });
+  });
+  
+  // 데이터가 있는 컬럼 인덱스만 추출
+  const keepIndices = colHasData.map((has, idx) => has ? idx : -1).filter(idx => idx !== -1);
+  
+  // 새 헤더와 행 생성
+  const newHeaders = keepIndices.map(idx => headers[idx]);
+  const newRows = rows.map(row => keepIndices.map(idx => row[idx]));
+  
+  return { headers: newHeaders, rows: newRows };
+}
+
 </script>
 </body>
 </html>
