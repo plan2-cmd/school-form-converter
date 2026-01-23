@@ -3,16 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>학교 반편성 데이터 관리 도구 v4.1</title>
+    <title>학교 반편성 데이터 관리 도구 v4.5</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
         body { font-family: 'Malgun Gothic', sans-serif; margin: 20px; background-color: #f4f7f8; color: #333; }
-        .container { max-width: 1100px; margin: auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
+        .container { max-width: 1200px; margin: auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
         h2 { text-align: center; color: #1a73e8; margin-bottom: 20px; }
         
         .config-box { background: #f8f9fa; padding: 15px; border: 1px solid #dee2e6; border-radius: 8px; margin-bottom: 20px; }
-        
-        /* 모드 선택 UI */
         .mode-area { display: flex; gap: 20px; margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px dashed #ccc; align-items: center; }
         .mode-label { font-weight: bold; color: #555; margin-right: 10px; }
         .radio-label { display: flex; align-items: center; cursor: pointer; font-size: 14px; font-weight: bold; }
@@ -23,10 +21,10 @@
         .config-item label { font-size: 12px; color: #666; margin-bottom: 5px; font-weight: bold; }
         .config-item input { padding: 8px; border: 1px solid #ccc; border-radius: 4px; text-align: center; font-weight: bold; background-color: #fff; }
         .config-item input.auto-detected { border-color: #34a853; background-color: #e6f4ea; }
+        .config-item input.default-applied { border-color: #fbbc04; background-color: #fff8e1; }
 
         #dropZone { border: 2px dashed #1a73e8; border-radius: 12px; padding: 40px; text-align: center; background-color: #f0f7ff; color: #1a73e8; cursor: pointer; transition: 0.3s; margin-bottom: 20px; font-weight: bold; }
         #dropZone.dragover { background-color: #d1e3ff; border-color: #0d47a1; transform: scale(1.01); }
-        #dropZone p { margin: 0; font-size: 16px; }
 
         .btn-area { border-top: 1px solid #eee; padding-top: 20px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
         button { padding: 12px 20px; border: none; border-radius: 6px; color: white; font-weight: bold; cursor: pointer; transition: 0.2s; font-size: 14px; }
@@ -37,22 +35,27 @@
         #status { font-weight: bold; font-size: 0.9em; width: 100%; margin-top: 10px; color:#666; }
 
         .tabs { display: flex; margin-top: 25px; border-bottom: 2px solid #dee2e6; }
-        .tab { padding: 10px 25px; cursor: pointer; background: #e9ecef; border-radius: 8px 8px 0 0; margin-right: 5px; border: 1px solid #dee2e6; border-bottom: none; }
+        .tab { padding: 10px 20px; cursor: pointer; background: #e9ecef; border-radius: 8px 8px 0 0; margin-right: 5px; border: 1px solid #dee2e6; border-bottom: none; font-size: 14px; }
         .tab.active { background: white; border-bottom: 2px solid white; margin-bottom: -2px; color: #1a73e8; font-weight: bold; }
         
-        .tab-content { display: none; background: white; border: 1px solid #dee2e6; border-top: none; height: 450px; overflow: auto; }
+        .tab-content { display: none; background: white; border: 1px solid #dee2e6; border-top: none; height: 500px; overflow: auto; }
         .tab-content.active { display: block; }
-        table { width: 100%; border-collapse: collapse; min-width: 900px; }
-        th, td { border: 1px solid #eee; padding: 10px; text-align: center; font-size: 13px; }
+        
+        table { width: 100%; border-collapse: collapse; min-width: 900px; font-size: 13px; }
+        th, td { border: 1px solid #eee; padding: 8px; text-align: center; white-space: nowrap; }
         th { background: #f8f9fa; position: sticky; top: 0; z-index: 10; border-bottom: 2px solid #dee2e6; }
         tr:hover { background-color: #f1f3f4; }
         .empty-msg { text-align: center; padding: 50px; color: #999; }
+
+        /* 원본 데이터 테이블 스타일 */
+        #tableRaw th { background-color: #e8f0fe; color: #174ea6; font-size: 12px; }
+        #tableRaw td:first-child { background-color: #f1f3f4; font-weight: bold; color: #555; position: sticky; left: 0; z-index: 5; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h2>🏫 반편성 데이터 관리 도구 (v4.1)</h2>
+    <h2>🏫 반편성 데이터 관리 도구 (v4.5)</h2>
 
     <div id="dropZone" onclick="document.getElementById('filePicker').click()">
         <p>파일을 여기에 드래그하거나 클릭하여 업로드</p>
@@ -64,7 +67,7 @@
             <label class="radio-label"><input type="radio" name="proc_mode" value="이전" checked onchange="onModeChange()"> 이전 모드 (배정반 기준)</label>
             <label class="radio-label"><input type="radio" name="proc_mode" value="진급" onchange="onModeChange()"> 진급 모드 (원적반 기준)</label>
         </div>
-        <div style="margin-bottom:10px; font-size:13px; color:#1a73e8; font-weight:bold;">⚙️ 추출 열 설정 (모드 변경 시 자동 재계산)</div>
+        <div style="margin-bottom:10px; font-size:13px; color:#1a73e8; font-weight:bold;">⚙️ 추출 열 설정 (자동 감지 / 수동 수정 가능)</div>
         <div class="config-grid">
             <div class="config-item"><label>성명</label><input type="number" id="idx_name" value="3" oninput="reprocess()"></div>
             <div class="config-item"><label>이전학년</label><input type="number" id="idx_p_g" value="12" oninput="reprocess()"></div>
@@ -86,6 +89,7 @@
     <div class="tabs">
         <div id="tab1" class="tab active" onclick="switchTab(1)">정상 데이터</div>
         <div id="tab2" class="tab" onclick="switchTab(2)">예외 데이터 (결측치)</div>
+        <div id="tab3" class="tab" onclick="switchTab(3)">불러온 모든 데이터 (Raw)</div>
     </div>
 
     <div id="view1" class="tab-content active">
@@ -98,6 +102,13 @@
     <div id="view2" class="tab-content">
         <table id="tableException">
             <thead><tr><th>성명</th><th>이전학년</th><th>이전반</th><th>이전번호</th><th>현재학년</th><th>현재반</th><th>현재번호</th></tr></thead>
+            <tbody></tbody>
+        </table>
+    </div>
+
+    <div id="view3" class="tab-content">
+        <table id="tableRaw">
+            <thead></thead>
             <tbody></tbody>
         </table>
     </div>
@@ -125,6 +136,7 @@
                 const workbook = XLSX.read(data, {type: 'array'});
                 const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
                 originalRawData = XLSX.utils.sheet_to_json(firstSheet, {header: 1, defval: ""});
+                
                 autoDetectAndMap(originalRawData);
                 processData(originalRawData);
             } catch (err) { alert("파일 처리 오류가 발생했습니다."); }
@@ -153,98 +165,102 @@
         let headerRowIdx = -1;
         let isMultiColumnHeader = false;
 
+        // 헤더 행 탐색 (성명과 학년이 동시에 있는 행)
         for (let i = 0; i < rows.length; i++) {
             const row = rows[i].map(c => String(c).trim());
-            if (row[0] === "학년") {
+            if (row.includes("성명") && row.includes("학년")) {
                 headerRowIdx = i;
                 if (row.filter(item => item === "학년").length >= 2) isMultiColumnHeader = true;
                 break;
             }
         }
 
-        if (headerRowIdx === -1) return;
+        // 매칭 실패 시 디폴트 적용
+        if (headerRowIdx === -1) {
+            applyDefaultSettings();
+            document.getElementById('status').innerHTML = `<span style="color:#d93025">⚠️ 헤더 감지 실패. 디폴트 설정 적용.</span>`;
+            return;
+        }
 
         const headerRow = rows[headerRowIdx].map(c => String(c).trim());
         const currentMode = document.querySelector('input[name="proc_mode"]:checked').value;
-
         const nameIdx = headerRow.indexOf("성명");
         if (nameIdx !== -1) document.getElementById('idx_name').value = nameIdx;
 
         if (isMultiColumnHeader) {
-            // 중복 헤더 케이스 (이전번호 추가)
             const firstGrade = headerRow.indexOf("학년");
             const firstClass = headerRow.indexOf("반");
             const firstNum = headerRow.indexOf("번호");
-            
             const lastGrade = headerRow.lastIndexOf("학년");
             const lastClass = headerRow.lastIndexOf("반");
             const lastNum = headerRow.lastIndexOf("번호");
 
             if (currentMode === "진급") {
-                // 진급: 앞=현재, 뒤=이전
                 document.getElementById('idx_c_g').value = firstGrade;
                 document.getElementById('idx_c_c').value = firstClass;
                 document.getElementById('idx_c_n').value = firstNum;
-
                 document.getElementById('idx_p_g').value = lastGrade;
                 document.getElementById('idx_p_c').value = lastClass;
                 document.getElementById('idx_p_n').value = lastNum;
             } else {
-                // 이전: 앞=이전, 뒤=현재
                 document.getElementById('idx_p_g').value = firstGrade;
                 document.getElementById('idx_p_c').value = firstClass;
                 document.getElementById('idx_p_n').value = firstNum;
-
                 document.getElementById('idx_c_g').value = lastGrade;
                 document.getElementById('idx_c_c').value = lastClass;
                 document.getElementById('idx_c_n').value = lastNum;
             }
         } else {
-            // 단일 헤더 케이스 (이전번호 추가)
             const gIdx = headerRow.indexOf("학년");
             const cIdx = headerRow.indexOf("반");
             const nIdx = headerRow.indexOf("번호");
 
             if (currentMode === "진급") {
-                // 진급: 메인=이전, 빈행=현재
                 if (gIdx !== -1) document.getElementById('idx_p_g').value = gIdx;
                 if (cIdx !== -1) document.getElementById('idx_p_c').value = cIdx;
                 if (nIdx !== -1) document.getElementById('idx_p_n').value = nIdx;
                 findInEmptyRows(rows, "현재");
             } else {
-                // 이전: 메인=현재, 빈행=이전
                 if (gIdx !== -1) document.getElementById('idx_c_g').value = gIdx;
                 if (cIdx !== -1) document.getElementById('idx_c_c').value = cIdx;
                 if (nIdx !== -1) document.getElementById('idx_c_n').value = nIdx;
                 findInEmptyRows(rows, "이전");
             }
         }
-        document.querySelectorAll('.config-item input').forEach(el => el.classList.add('auto-detected'));
-        document.getElementById('status').innerHTML = `<span style="color:#1a73e8">[${currentMode} 모드] 설정 적용됨.</span>`;
+        document.querySelectorAll('.config-item input').forEach(el => { el.classList.remove('default-applied'); el.classList.add('auto-detected'); });
+        document.getElementById('status').innerHTML = `<span style="color:#1a73e8">[${currentMode} 모드] 헤더를 감지하여 설정했습니다.</span>`;
+    }
+
+    function applyDefaultSettings() {
+        document.querySelector('input[name="proc_mode"][value="이전"]').checked = true;
+        document.getElementById('idx_name').value = 3;
+        document.getElementById('idx_p_g').value = 12;
+        document.getElementById('idx_p_c').value = 13;
+        document.getElementById('idx_p_n').value = 15;
+        document.getElementById('idx_c_g').value = 0;
+        document.getElementById('idx_c_c').value = 1;
+        document.getElementById('idx_c_n').value = 2;
+        document.querySelectorAll('.config-item input').forEach(el => { el.classList.remove('auto-detected'); el.classList.add('default-applied'); });
     }
 
     function findInEmptyRows(rows, targetType) {
-        let gFound = false, cFound = false, nFound = false;
-
+        let gFound=false, cFound=false, nFound=false;
         for (let r of rows) {
             const row = r.map(c => String(c).trim());
             if (row[0] === "") {
                 if (!gFound && row.includes("학년")) {
                     const idx = row.indexOf("학년");
-                    if (targetType === "현재") document.getElementById('idx_c_g').value = idx;
-                    else document.getElementById('idx_p_g').value = idx;
+                    if (targetType === "현재") document.getElementById('idx_c_g').value = idx; else document.getElementById('idx_p_g').value = idx;
                     gFound = true;
                 }
                 if (!cFound && row.includes("반")) {
                     const idx = row.indexOf("반");
-                    if (targetType === "현재") document.getElementById('idx_c_c').value = idx;
-                    else document.getElementById('idx_p_c').value = idx;
+                    if (targetType === "현재") document.getElementById('idx_c_c').value = idx; else document.getElementById('idx_p_c').value = idx;
                     cFound = true;
                 }
                 if (!nFound && row.includes("번호")) {
                     const idx = row.indexOf("번호");
-                    if (targetType === "현재") document.getElementById('idx_c_n').value = idx;
-                    else document.getElementById('idx_p_n').value = idx;
+                    if (targetType === "현재") document.getElementById('idx_c_n').value = idx; else document.getElementById('idx_p_n').value = idx;
                     nFound = true;
                 }
             }
@@ -260,7 +276,7 @@
             name: parseInt(document.getElementById('idx_name').value),
             p_g:  parseInt(document.getElementById('idx_p_g').value),
             p_c:  parseInt(document.getElementById('idx_p_c').value),
-            p_n:  parseInt(document.getElementById('idx_p_n').value), // 이전번호 추가
+            p_n:  parseInt(document.getElementById('idx_p_n').value),
             c_g:  parseInt(document.getElementById('idx_c_g').value),
             c_c:  parseInt(document.getElementById('idx_c_c').value),
             c_n:  parseInt(document.getElementById('idx_c_n').value)
@@ -276,39 +292,80 @@
                 let currentNum = cleanRow[mapping.c_n];
                 if (currentNum === "0" || currentNum === "0.0") currentNum = "";
                 
-                // 추출 데이터 (7개 항목)
                 const extracted = [
-                    cleanRow[mapping.name], 
-                    cleanRow[mapping.p_g], 
-                    cleanRow[mapping.p_c], 
-                    cleanRow[mapping.p_n], // 이전번호
-                    cleanRow[mapping.c_g], 
-                    cleanRow[mapping.c_c], 
-                    currentNum
+                    cleanRow[mapping.name], cleanRow[mapping.p_g], cleanRow[mapping.p_c], cleanRow[mapping.p_n], 
+                    cleanRow[mapping.c_g], cleanRow[mapping.c_c], currentNum
                 ];
 
-                // 필수값 체크 (이전번호/현재번호는 공란이어도 예외 아님으로 처리하거나, 학교 사정에 따라 조정)
-                // 현재 로직: 성명, 학년, 반 정보만 필수
                 const isInvalid = [extracted[0], extracted[1], extracted[2], extracted[4], extracted[5]].some(v => v === "" || v.toLowerCase() === "nan");
-                
                 if (isInvalid) finalException.push(extracted);
                 else finalValid.push(extracted);
             }
         });
         renderUI();
+        renderRawTable(); // 원본 데이터 탭 렌더링
     }
 
     function resetAll() {
         if (!confirm("초기화하시겠습니까?")) return;
         originalRawData = []; finalValid = []; finalException = [];
         filePicker.value = ""; document.getElementById('status').innerHTML = "파일을 대기 중입니다...";
-        document.querySelectorAll('.config-item input').forEach(el => el.classList.remove('auto-detected'));
+        document.querySelectorAll('.config-item input').forEach(el => { el.classList.remove('auto-detected'); el.classList.remove('default-applied'); });
         renderUI();
+        renderRawTable();
     }
 
     function renderUI() {
         fillTable('tableValid', finalValid); fillTable('tableException', finalException);
         if (originalRawData.length > 0) document.getElementById('status').innerHTML += ` | 정상 <b>${finalValid.length}</b>건 / 예외 <b>${finalException.length}</b>건`;
+    }
+
+    // 원본 데이터(Raw) 렌더링 함수
+    function renderRawTable() {
+        const table = document.getElementById('tableRaw');
+        const thead = table.querySelector('thead');
+        const tbody = table.querySelector('tbody');
+        thead.innerHTML = ""; tbody.innerHTML = "";
+
+        if (originalRawData.length === 0) return;
+
+        // 최대 열 개수 계산
+        let maxCol = 0;
+        originalRawData.forEach(r => { if (r.length > maxCol) maxCol = r.length; });
+
+        // 헤더 생성 (0 A, 1 B, 2 C ...)
+        let headerHTML = "<tr><th>행\\열</th>";
+        for (let i = 0; i < maxCol; i++) {
+            headerHTML += `<th>${i} (${getColName(i)})</th>`;
+        }
+        headerHTML += "</tr>";
+        thead.innerHTML = headerHTML;
+
+        // 본문 생성 (대량 데이터 성능 고려하여 상위 500개만 표시하거나 전체 표시)
+        // 여기서는 전체 표시
+        originalRawData.forEach((row, rIdx) => {
+            let tr = document.createElement('tr');
+            let th = document.createElement('td');
+            th.textContent = rIdx; 
+            tr.appendChild(th);
+
+            for (let cIdx = 0; cIdx < maxCol; cIdx++) {
+                let td = document.createElement('td');
+                td.textContent = row[cIdx] !== undefined ? row[cIdx] : "";
+                tr.appendChild(td);
+            }
+            tbody.appendChild(tr);
+        });
+    }
+
+    // 엑셀 컬럼 명칭 변환 (0->A, 25->Z, 26->AA)
+    function getColName(n) {
+        let s = "";
+        while (n >= 0) {
+            s = String.fromCharCode(n % 26 + 65) + s;
+            n = Math.floor(n / 26) - 1;
+        }
+        return s;
     }
 
     function fillTable(id, data) {
@@ -329,7 +386,6 @@
 
     function exportToCSV() {
         if (finalValid.length === 0) return alert("저장할 데이터가 없습니다.");
-        // 헤더 변경: 성명,학년,반,번호,학년,반,번호
         const header = ["성명", "학년", "반", "번호", "학년", "반", "번호"];
         const rows = [header, ...finalValid];
         const csvString = rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(",")).join("\r\n");
