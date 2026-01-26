@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>기관 코드 이동 시스템</title>
+    <style>
+        body {
+            font-family: 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f0f2f5;
+        }
+
+        .container {
+            background-color: white;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            text-align: center;
+            width: 400px;
+        }
+
+        h2 {
+            margin-bottom: 1.5rem;
+            color: #333;
+        }
+
+        .input-group {
+            margin-bottom: 1rem;
+            text-align: left;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: bold;
+            color: #555;
+        }
+
+        input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            box-sizing: border-box;
+            font-size: 16px;
+        }
+
+        input:focus {
+            border-color: #007bff;
+            outline: none;
+        }
+
+        .helper-text {
+            font-size: 0.8rem;
+            color: #888;
+            margin-top: 1rem;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h2>사이트 이동 시스템</h2>
+        
+        <div class="input-group">
+            <label for="baseUrl">기본 주소 (URL)</label>
+            <!-- value 속성을 제거했습니다. -->
+            <input type="text" id="baseUrl" placeholder="예: mysite.com">
+        </div>
+
+        <div class="input-group">
+            <label for="orgCode">기관 코드</label>
+            <input type="text" id="orgCode" placeholder="코드를 입력 후 엔터">
+        </div>
+
+        <p class="helper-text">* 기관 코드 입력 후 Enter 키를 누르세요.</p>
+    </div>
+
+    <script>
+        const baseUrlInput = document.getElementById('baseUrl');
+        const orgCodeInput = document.getElementById('orgCode');
+
+        orgCodeInput.addEventListener('keydown', function(event) {
+            if (event.key === 'Enter') {
+                moveToLink();
+            }
+        });
+
+        function moveToLink() {
+            let baseUrl = baseUrlInput.value.trim();
+            const code = orgCodeInput.value.trim();
+
+            if (!baseUrl || !code) {
+                alert("주소와 기관 코드를 모두 입력해주세요.");
+                return;
+            }
+
+            // 사용자가 http를 입력하지 않았으면 자동으로 https:// 를 붙여줍니다.
+            if (!baseUrl.startsWith('http://') && !baseUrl.startsWith('https://')) {
+                baseUrl = 'https://' + baseUrl;
+            }
+
+            let finalUrl;
+            // 주소 끝에 / 유무에 따라 처리
+            if (baseUrl.endsWith('/')) {
+                finalUrl = baseUrl + code;
+            } else {
+                finalUrl = baseUrl + '/' + code;
+            }
+
+            // 페이지 이동
+            window.location.href = finalUrl; 
+        }
+    </script>
+</body>
+</html>
