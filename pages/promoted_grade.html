@@ -366,20 +366,27 @@ function extractGradeRaw(gradeStr) {
   }
   
   // 통합학교 형식: "초등 1학년", "중학 2학년" 등 그대로 반환
-  const integratedMatch = str.match(/(초등|중학|중등|고등|전공)\s*(\d+)\s*학년/);
+  const integratedMatch = str.match(/(초등|중학|중등|고등|전공)\s*(\d+)\s*학년?/);
   if (integratedMatch) {
     return `${integratedMatch[1]} ${integratedMatch[2]}학년`;
   }
   
-  // "N학년" 형태
+  // "N학년" 형태 -> 숫자 추출하여 "N학년" 형식으로 반환
   const gradeMatch = str.match(/(\d+)\s*학년/);
   if (gradeMatch) {
-    return gradeMatch[0];
+    return `${gradeMatch[1]}학년`;
   }
   
-  // 단순 숫자
-  if (/^\d+$/.test(str)) {
-    return str;
+  // 단순 숫자만 있는 경우 -> "N학년" 형식으로 반환
+  const numOnly = str.match(/^(\d+)$/);
+  if (numOnly) {
+    return `${numOnly[1]}학년`;
+  }
+  
+  // 그 외에 숫자가 포함된 경우 숫자 추출
+  const anyNum = str.match(/(\d+)/);
+  if (anyNum) {
+    return `${anyNum[1]}학년`;
   }
   
   return str;
