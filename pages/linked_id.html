@@ -69,7 +69,7 @@
         
         <div class="input-group">
             <label for="baseUrl">기본 주소 (URL)</label>
-            <!-- value 속성을 제거했습니다. -->
+            <!-- https:// 기본값 제거됨 -->
             <input type="text" id="baseUrl" placeholder="예: mysite.com">
         </div>
 
@@ -78,7 +78,7 @@
             <input type="text" id="orgCode" placeholder="코드를 입력 후 엔터">
         </div>
 
-        <p class="helper-text">* 기관 코드 입력 후 Enter 키를 누르세요.</p>
+        <p class="helper-text">* 기관 코드 입력 후 Enter 키를 누르면 새 창이 열립니다.</p>
     </div>
 
     <script>
@@ -100,21 +100,21 @@
                 return;
             }
 
-            // 사용자가 http를 입력하지 않았으면 자동으로 https:// 를 붙여줍니다.
+            // http 프로토콜 자동 추가
             if (!baseUrl.startsWith('http://') && !baseUrl.startsWith('https://')) {
                 baseUrl = 'https://' + baseUrl;
             }
 
             let finalUrl;
-            // 주소 끝에 / 유무에 따라 처리
+            // 슬래시(/) 처리
             if (baseUrl.endsWith('/')) {
                 finalUrl = baseUrl + code;
             } else {
                 finalUrl = baseUrl + '/' + code;
             }
 
-            // 페이지 이동
-            window.location.href = finalUrl; 
+            // [변경됨] 새 창(또는 새 탭)으로 열기
+            window.open(finalUrl, '_blank');
         }
     </script>
 </body>
