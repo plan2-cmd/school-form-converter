@@ -288,13 +288,30 @@ function findEalimiColumns(headers){
 ========================= */
 function extractNameKeys(name) {
   const nameKeys = new Set();
-  nameKeys.add(normCol(name));
+  const trimmedName = String(name || '').trim();
+  if (!trimmedName) return nameKeys;
   
-  // 괄호 안의 이름도 추가
-  const match = name.match(/$$([^)]+)$$/);
-  if (match) {
-    nameKeys.add(normCol(match[1]));
+  // 1. 전체 이름 추가 (공백 제거)
+  nameKeys.add(normCol(trimmedName));
+  
+  // 2. 괄호가 있는 경우 처리
+  const parenMatch = trimmedName.match(/^(.+?)\s*\(([^)]+)\)$/);
+  if (parenMatch) {
+    const beforeParen = parenMatch[1].trim(); // 괄호 앞 (예: "YE SHUTONG" 또는 "홍길동")
+    const insideParen = parenMatch[2].trim(); // 괄호 안 (예: "예수퉁" 또는 "HONG GILDONG")
+    
+    // 괄호 앞 이름 추가 (공백 있는 버전과 없는 버전 모두)
+    nameKeys.add(normCol(beforeParen));
+    nameKeys.add(beforeParen.toUpperCase().replace(/\s+/g, '')); // 공백 제거 버전
+    
+    // 괄호 안 이름 추가 (공백 있는 버전과 없는 버전 모두)
+    nameKeys.add(normCol(insideParen));
+    nameKeys.add(insideParen.toUpperCase().replace(/\s+/g, '')); // 공백 제거 버전
   }
+  
+  // 3. 영문명 공백 제거 버전도 추가 (공백 유무 관계없이 매칭)
+  const upperName = trimmedName.toUpperCase().replace(/\s+/g, '');
+  nameKeys.add(upperName);
   
   return nameKeys;
 }
@@ -785,19 +802,50 @@ let status = "미매칭";
   if(!nameKeys.length && status !== "졸업") status = "미매칭(이름키없음)";
       
 if(matched){
-  // 진급학년: "26년 N학년" 또는 "26년 초등 N학년" 형식으로 포맷팅
+  // 진급학년: e알리미 원본 학년 형식을 참조하여 연도만 "26년"으로 교체
   const rawGrade = matched["진급학년"];
+  const originalGradeCol = String(row[pos.cur_g] || ''); // e알리미 원본 학년 컬럼
+  
   if (rawGrade !== null && rawGrade !== undefined && rawGrade !== "") {
     const gradeStr = String(rawGrade);
+    // 진급명렬에서 진급학년 숫자 추출
+    const gradeNumMatch = gradeStr.match(/(\d+)/);
+    const newGradeNum = gradeNumMatch ? gradeNumMatch[1] : null;
+    
     // 통합학교 형식 확인: "초등 2학년", "중학 1학년" 등
     const integratedMatch = gradeStr.match(/(초등|중학|중등|고등|전공)\s*(\d+)/);
+    
     if (integratedMatch) {
       // 통합학교: "26년 초등 2학년" 형식
       row[pos.nxt_g] = `26년 ${integratedMatch[1]} ${integratedMatch[2]}학년`;
+    } else if (newGradeNum && originalGradeCol) {
+      // 일반학교: e알리미 원본 형식에서 연도를 26년으로, 학년을 진급학년으로 교체
+      // 예: "2025년도 3학년 학생" -> "26년 4학년 학생"
+      // 예: "25 3학년 학부모" -> "26년 4학년 학부모"
+      
+      let formatted = originalGradeCol;
+      
+      // 1. 연도 패턴 교체: 202x년도, 202x년, 202x, 2x년, 2x -> "26년"
+      formatted = formatted
+        .replace(/20\d{2}\s*년도?\s*/g, '26년 ')  // "2025년도 ", "2025년 ", "2025 "
+        .replace(/2[0-9]\s*년\s*/g, '26년 ')      // "25년 "
+        .replace(/2[0-9]\s+(?=\d학년)/g, '26년 '); // "25 3학년" -> "26년 3학년"
+      
+      // 2. 학년 숫자 교체: N학년 -> 진급학년
+      formatted = formatted.replace(/(\d+)\s*학년/, `${newGradeNum}학년`);
+      
+      // 3. 연도가 아예 없던 경우 (예: "3학년 학부모") -> "26년 " 접두어 추가
+      if (!formatted.includes('26년')) {
+        formatted = '26년 ' + formatted;
+      }
+      
+      // 4. 공백 정리
+      formatted = formatted.replace(/\s+/g, ' ').trim();
+      
+      row[pos.nxt_g] = formatted;
     } else {
-      // 일반학교: 숫자만 추출하여 "26년 N학년" 형식
-      const gradeNum = gradeStr.match(/\d+/);
-      row[pos.nxt_g] = gradeNum ? `26년 ${gradeNum[0]}학년` : gradeStr;
+      // 폴백: 그냥 "26년 N학년" 형식
+      row[pos.nxt_g] = newGradeNum ? `26년 ${newGradeNum}학년` : gradeStr;
     }
   } else {
     row[pos.nxt_g] = "";
