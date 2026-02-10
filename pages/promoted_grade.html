@@ -73,7 +73,7 @@
     </div>
 
     <div class="row" style="margin-top:12px;">
-      <button id="runBtn" class="primary" disabled>실행</button>
+      <button id="runBtn" class="primary" disabled>���행</button>
       <button id="resetBtn">초기화</button>
       <div id="runStatus" class="status" style="flex:1;">대기 중</div>
     </div>
@@ -284,7 +284,16 @@ function findEalimiColumns(headers){
 }
 
 /* =========================
-   6) 학교 진급명렬에서 학생이름 추출
+   6) 동명이인 구분자 제거 (1, 2, A, B 등)
+========================= */
+function removeNameSuffix(name) {
+  const str = String(name || '').trim();
+  // 이름 뒤의 숫자(1-9) 또는 알파벳(A-Z, a-z) 제거
+  return str.replace(/([0-9]|[A-Za-z])$/, '').trim();
+}
+
+/* =========================
+   7) 학교 진급명렬에서 학생이름 추출
 ========================= */
 function extractNameKeys(name) {
   const nameKeys = new Set();
@@ -294,7 +303,13 @@ function extractNameKeys(name) {
   // 1. 전체 이름 추가 (공백 제거)
   nameKeys.add(normCol(trimmedName));
   
-  // 2. 괄호가 있는 경우 처리
+  // 2. 구분자 제거 버전도 추가 (동명이인 구분자: 1, 2, A, B 등)
+  const nameWithoutSuffix = removeNameSuffix(trimmedName);
+  if (nameWithoutSuffix && nameWithoutSuffix !== trimmedName) {
+    nameKeys.add(normCol(nameWithoutSuffix));
+  }
+  
+  // 3. 괄호가 있는 경우 처리
   const parenMatch = trimmedName.match(/^(.+?)\s*\(([^)]+)\)$/);
   if (parenMatch) {
     const beforeParen = parenMatch[1].trim(); // 괄호 앞 (예: "YE SHUTONG" 또는 "홍길동")
@@ -304,14 +319,34 @@ function extractNameKeys(name) {
     nameKeys.add(normCol(beforeParen));
     nameKeys.add(beforeParen.toUpperCase().replace(/\s+/g, '')); // 공백 제거 버전
     
+    // 괄호 앞에서 구분자 제거한 버전도 추가
+    const beforeParenNoSuffix = removeNameSuffix(beforeParen);
+    if (beforeParenNoSuffix && beforeParenNoSuffix !== beforeParen) {
+      nameKeys.add(normCol(beforeParenNoSuffix));
+      nameKeys.add(beforeParenNoSuffix.toUpperCase().replace(/\s+/g, ''));
+    }
+    
     // 괄호 안 이름 추가 (공백 있는 버전과 없는 버전 모두)
     nameKeys.add(normCol(insideParen));
     nameKeys.add(insideParen.toUpperCase().replace(/\s+/g, '')); // 공백 제거 버전
+    
+    // 괄호 안에서 구분자 제거한 버전도 추가
+    const insideParenNoSuffix = removeNameSuffix(insideParen);
+    if (insideParenNoSuffix && insideParenNoSuffix !== insideParen) {
+      nameKeys.add(normCol(insideParenNoSuffix));
+      nameKeys.add(insideParenNoSuffix.toUpperCase().replace(/\s+/g, ''));
+    }
   }
   
-  // 3. 영문명 공백 제거 버전도 추가 (공백 유무 관계없이 매칭)
+  // 4. 영문명 공백 제거 버전도 추가 (공백 유무 관계없이 매칭)
   const upperName = trimmedName.toUpperCase().replace(/\s+/g, '');
   nameKeys.add(upperName);
+  
+  // 5. 구분자 없이 공백 제거한 버전도 추가
+  const upperNameNoSuffix = removeNameSuffix(trimmedName).toUpperCase().replace(/\s+/g, '');
+  if (upperNameNoSuffix && upperNameNoSuffix !== upperName) {
+    nameKeys.add(upperNameNoSuffix);
+  }
   
   return nameKeys;
 }
@@ -440,7 +475,7 @@ function isGraduationGrade(grade, graduationGrades) {
 }
 
 /* =========================
-   8) 반 추출 (숫자 또는 한글 반 지원)
+   8) 반 추출 (숫자 또는 한글 반 지원 - 다중 글자 한글 반명 포함)
 ========================= */
 function extractClass(classStr) {
   const str = String(classStr || '').trim();
@@ -452,22 +487,22 @@ function extractClass(classStr) {
     return parseInt(numMatch[1], 10);
   }
   
-  // 2. 한글 반 (가, 나, 다, 라, 마, 바, 사 등)
-  const koreanClassMatch = str.match(/([가나다라마바사아자차카타파하])\s*반?/);
-  if (koreanClassMatch) {
-    return koreanClassMatch[1]; // 한글 문자 그대로 반환
+  // 2. 다중 글자 한글 반 ("사랑", "지혜", "우정", "희망" 등)
+  const multiKoreanMatch = str.match(/([가-힣]{2,})\s*반?/);
+  if (multiKoreanMatch) {
+    return multiKoreanMatch[1]; // 한글 문자열 그대로 반환
   }
   
-  // 3. 단독 숫자
+  // 3. 단일 글자 한글 반 (가, 나, 다, 라, 마, 바, 사 등)
+  const singleKoreanMatch = str.match(/([가나다라마바사아자차카타파하])\s*반?/);
+  if (singleKoreanMatch) {
+    return singleKoreanMatch[1]; // 한글 문자 그대로 반환
+  }
+  
+  // 4. 단독 숫자
   const singleNum = str.match(/\d+/);
   if (singleNum) {
     return parseInt(singleNum[0], 10);
-  }
-  
-  // 4. 단독 한글 반 문자
-  const singleKorean = str.match(/^[가나다라마바사아자차카타파하]$/);
-  if (singleKorean) {
-    return singleKorean[0];
   }
   
   return null;
@@ -1034,16 +1069,17 @@ setStatus(`<span class="ok">완료</span> | 학교유형: <b>${schoolType}</b> |
     dlMissingBtn.disabled = false;
     dlRollbackBtn.disabled = false;
     
-    dlUploadBtn.onclick = () => {
-      const filtered = removeEmptyColumns(uploadHeaders, matchedRows);
-      downloadCsv(`진급_업로드용(매칭행만)_${timestamp}.csv`, filtered.rows, filtered.headers, false);
-    };
+  dlUploadBtn.onclick = () => {
+  const filtered = removeEmptyColumns(uploadHeaders, matchedRows, pos.nxt_n);
+  downloadCsv(`진급_업로드용(매칭행만)_${timestamp}.csv`, filtered.rows, filtered.headers, false);
+  };
     dlReportBtn.onclick = () => downloadCsv(`진급_매칭리포트_${timestamp}.csv`, report, reportHeaders, true);
     dlMissingBtn.onclick = () => downloadCsv(`진급누락목록_${timestamp}.csv`, missingRows, missingHeaders, true);
-    dlRollbackBtn.onclick = () => {
-      const filtered = removeEmptyColumns(rollbackHeaders, rollbackRows);
-      downloadCsv(`진급_롤백용_${timestamp}.csv`, filtered.rows, filtered.headers, false);
-    };
+  dlRollbackBtn.onclick = () => {
+  // 롤백파일은 컬럼 순서가 바뀔 수 있으므로 null 전달 (모든 빈 컬럼 제거)
+  const filtered = removeEmptyColumns(rollbackHeaders, rollbackRows, null);
+  downloadCsv(`진급_롤백용_${timestamp}.csv`, filtered.rows, filtered.headers, false);
+  };
 
     let previewHtml = '<h4>업로드용(매칭행만) 상위 5행</h4>';
     previewHtml += '<table><thead><tr>';
@@ -1216,13 +1252,21 @@ function downloadRollbackCsv(filename, rows, headers) {
   URL.revokeObjectURL(url);
 }
 
-function removeEmptyColumns(headers, rows) {
+  function removeEmptyColumns(headers, rows, nxt_n) {
+  // nxt_n이 유지해야 할 번호 컬럼 인덱스 (pos.nxt_n에서 전달됨)
+  
   // 각 컬럼별로 데이터가 있는지 확인
   const colHasData = headers.map((_, colIdx) => {
-    return rows.some(row => {
-      const val = row[colIdx];
-      return val !== null && val !== undefined && String(val).trim() !== '';
-    });
+  // nxt_n이 지정된 경우, 그 컬럼은 비어있어도 유지
+  if (nxt_n !== null && nxt_n !== undefined && colIdx === nxt_n) {
+    return true;
+  }
+  
+  // 그 외에는 데이터 존재 여부로 판정
+  return rows.some(row => {
+    const val = row[colIdx];
+    return val !== null && val !== undefined && String(val).trim() !== '';
+  });
   });
   
   // 데이터가 있는 컬럼 인덱스만 추출
@@ -1233,7 +1277,7 @@ function removeEmptyColumns(headers, rows) {
   const newRows = rows.map(row => keepIndices.map(idx => row[idx]));
   
   return { headers: newHeaders, rows: newRows };
-}
+  }
 
 </script>
 </body>
