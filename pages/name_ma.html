@@ -927,11 +927,7 @@ function ensureMappingHeaders(){
   }
 }
 function maybeNormalizeNameForOutput(map, value){
-  const f1NameCol = els.f1_name.value;
-  const f2NameCol = els.f2_name.value;
-  if (map.source === "file1" && map.col === f1NameCol) return normalizeName(value);
-  if (map.source === "file2" && map.col === f2NameCol) return normalizeName(value);
-  return value;
+  return value; // 출력 시 공백 제거 없음
 }
 function buildOutputAOA(){
   ensureMappingHeaders();
